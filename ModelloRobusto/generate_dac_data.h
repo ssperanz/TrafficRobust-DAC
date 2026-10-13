@@ -36,11 +36,14 @@ public:
   const TimeSlot &get(int t) const { return slots[t]; }
 };
 
+class Flow;
+
 class AirBlock {
 public:
   int index;
   int row;
   int col;
+  std::vector<Flow *> flows; // flussi che attraversano l’airblock
 
   std::vector<double> traffic;
   std::vector<int> pLevel;
@@ -59,6 +62,8 @@ public:
   void setglevel(int t, int g);
   void setplevel(int t, int p);
   int getIndex();
+  std::vector<Flow *> getFlows();
+  void addFlow(Flow *f);
 };
 
 class Sector {

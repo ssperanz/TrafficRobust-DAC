@@ -31,6 +31,10 @@ void AirBlock::setTraffic(int time, double traff) { traffic[time] = traff; }
 
 double AirBlock::getTraffic(int t) { return traffic[t]; }
 
+std::vector<Flow *> AirBlock::getFlows() { return flows; }
+
+void AirBlock::addFlow(Flow *f) { flows.push_back(f); }
+
 // SECTOR
 
 double Sector::getTraffic(int t) {
