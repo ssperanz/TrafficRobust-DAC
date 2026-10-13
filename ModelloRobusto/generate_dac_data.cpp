@@ -128,6 +128,13 @@ int Flow::getTimeThroughAirBlock(int ab_index) {
   return time_through_airblock[ab_index];
 }
 
+int Flow::getScheduledDepartures(int time) {
+  if (time < 0 || time >= scheduled_departures.size()) {
+    throw std::out_of_range("Invalid time index");
+  }
+  return scheduled_departures[time];
+}
+
 int Flow::tao_f_a(int t, int ab_index) {
   return std::max(0, t - getTimeToReachAirBlock(ab_index) -
                          getTimeThroughAirBlock(ab_index) + 1);
@@ -147,10 +154,10 @@ AirBlock &Grid::airBlock(int row, int col) {
 
 int Grid::getNTimeslots() { return m_time.size(); }
 
-int Grid::geth() { return h; }
+int Grid::get_t_p() { return t_p; }
 
-Grid::Grid(int rows, int cols, const TimeHorizon &time, int h)
-    : m_rows(rows), m_cols(cols), m_time(time), h(h) {
+Grid::Grid(int rows, int cols, const TimeHorizon &time, int t_p)
+    : m_rows(rows), m_cols(cols), m_time(time), t_p(t_p) {
   int id = 0;
 
   for (int r = 0; r < rows; ++r)
@@ -239,7 +246,7 @@ std::vector<int> DACData::getSimilarConfigurationsIndex(Configuration &c1) {
 
 DACData::DACData(const std::string &filename)
     : grid(readGrid(filename)), epsilon(1e-4) {
-  std::cout << "finito llettura griglia" << std::endl;
+  std::cout << "finito lettura griglia" << std::endl;
   readRest(filename);
 }
 std::string DACData::trim(std::string s) {

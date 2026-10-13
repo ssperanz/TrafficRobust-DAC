@@ -123,6 +123,7 @@ public:
                                                      AirBlock *ab);
   int getTimeToReachAirBlock(int ab_index);
   int getTimeThroughAirBlock(int ab_index);
+  int getScheduledDepartures(int time);
   int tao_f_a(int t,
               int ab_index); // the earliest entry time in airspace block 'a' of
                              // aircraft in flow 'f' that are still in airspace
@@ -144,7 +145,7 @@ public:
   AirBlock &airBlock(int id);
 
   int getNTimeslots();
-  int geth();
+  int get_t_p();
 
   const std::array<double, 3> w = {
       0.10, 0.50, 0.20}; // peso di riduzione della capacit`a per un airblock
@@ -161,8 +162,8 @@ private:
   std::vector<AirBlock> m_airBlocks;
   TimeHorizon m_time;
 
-  int h; // minimo slot temporale che deve passare tra due configurazioni
-         // diverse
+  int t_p; // minimo slot temporale che deve passare tra due configurazioni
+           // diverse
 };
 
 class DACData {
@@ -171,7 +172,11 @@ public:
   Grid grid;
   std::vector<Sector> sectors;
   std::vector<Configuration> configurations;
+  std::vector<AirBlock> airblocks;
+  std::vector<Flow> flows;
 
+  int PERIOD_LENGTH =
+      60; // lunghezza della discretizzazione temporale in minuti (parametro)
   double epsilon; // tolleranza per la condizione di arresto
 
   int getNConfigurations();

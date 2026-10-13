@@ -4,91 +4,83 @@
 #include <iostream>
 
 MasterSolution Master::solve() {
-  model.optimize();
-  MasterSolution solution(x, s, theta, model);
+  master_model.optimize();
+  MasterSolution solution(x, s, theta, master_model);
   iter++;
   return solution;
 }
 
 Master::Master(DACData data, GRBEnv &env)
     : T(data.grid.getNTimeslots()), C(data.getNConfigurations()), x(T, C),
-      s(T, C), env(env), model(env), data(data), iter(0) {
+      s(T, C), env(env), master_model(env), data(data), iter(0) {
   int T = data.grid.getNTimeslots();
   int C = data.getNConfigurations();
+  int t_p = data.grid.get_t_p();
 
-  for (int t = 0; t < T; t++) {
-    for (int c = 0; c < C; c++) {
-      string name = "x_" + to_string(t) + "_" + to_string(c);
-      x.at(t, c) = model.addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
+  // TODO?? 6.34 con valori nominali
+
+  for (int c = 0; c < C; c++) {
+    for (int t = 0; t < T - t_p; t++) {
+      string x_name = "x_" + to_string(t) + "_" + to_string(c);
+      string s_name = "s_" + to_string(t) + "_" + to_string(c);
+      x.at(t, c) =
+          master_model.addVar(0.0, 1.0, 0.0, GRB_BINARY, x_name); // 6.40
+      s.at(t, c) =
+          master_model.addVar(0.0, 1.0, 0.0, GRB_BINARY, s_name); // 6.41
+    }
+    for (int t = T - t_p; t < T; t++) {
+      string x_name = "x_" + to_string(t) + "_" + to_string(c);
+      x.at(t, c) =
+          master_model.addVar(0.0, 1.0, 0.0, GRB_BINARY, x_name); // 6.40
     }
   }
 
-  for (int t = 0; t < T; t++) {
-    for (int c = 0; c < C; c++) {
-      string name = "s_" + to_string(t) + "_" + to_string(c);
-      s.at(t, c) = model.addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
-    }
-  }
-
-  // Vincolo 5.22 uguale al nominale
   for (int t = 0; t < T; t++) {
     GRBLinExpr sum = 0;
     for (int c = 0; c < C; c++)
       sum += x.at(t, c);
-
-    model.addConstr(sum == 1);
+    master_model.addConstr(sum == 1); // 6.35
   }
 
-  // Vincolo 5.23 uguale al nominale
+  // TODO da rivedere
   for (int t = 0; t < T - 1; t++) {
-    int t_succ = t + 1;
     for (int c = 0; c < C; c++) {
       vector<int> c_similar =
           data.getSimilarConfigurationsIndex(data.configurations[c]);
-      // vector<int> c_similar;
-      // c_similar.push_back(0); //DA RIMUOVERE
-      // c_similar.push_back(1); //DA RIMUOVERE
       GRBLinExpr sum = 0;
       for (int c_similar_idx = 0; c_similar_idx < c_similar.size();
            c_similar_idx++) {
-        sum += x.at(t_succ, c_similar[c_similar_idx]);
+        sum += x.at(t + 1, c_similar[c_similar_idx]);
       }
 
-      model.addConstr(x.at(t, c) - sum <= 0);
+      master_model.addConstr(x.at(t, c) - sum <= 0); // 6.36
     }
   }
 
-  // Vincolo 5.24 uguale al nominale
-  for (int t = 0; t < T; t++) {
-    int t_prec = t - 1;
-    for (int c = 0; c < C; c++) {
-      if (t == 0) {
-        model.addConstr(x.at(t, c) <= s.at(t, c));
-      } else {
-        model.addConstr(x.at(t, c) - x.at(t_prec, c) <= s.at(t, c));
-      }
+  for (int c = 0; c < C; c++) {
+    master_model.addConstr(x.at(0, c) <= s.at(0, c)); // 6.39
+    for (int t = 1; t < T; t++) {
+      master_model.addConstr(x.at(t, c) - x.at(t - 1, c) <= s.at(t, c)); // 6.38
     }
   }
 
-  // Vincolo 5.25 uguale al nominale
-  int h = data.grid.geth();
-  for (int t = 0; t < T; t++) {
+  for (int t = 0; t < T - t_p; t++) {
     GRBLinExpr sum = 0;
-    int upper_limit = std::min(t + h - 1, T - 1);
-    for (int y = t; y <= upper_limit; y++) {
-      for (int c = 0; c < C; c++) {
-        sum += s.at(y, c);
+    for (int tao = t; tao <= t + t_p - 1; tao++) {
+      for (int c = 0; c < C;
+           c++) {            // TODO da rivedere, qui C non dipende da tao
+        sum += s.at(tao, c); // 6.37
       }
     }
-    model.addConstr(sum <= 1);
+    master_model.addConstr(sum <= 1);
   }
   // Inizializza la variabile theta
-  theta = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "theta");
+  theta = master_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "theta");
 
   // Sincronizza il modello
-  model.update();
+  master_model.update();
 
-  model.setObjective(theta, GRB_MINIMIZE);
+  master_model.setObjective(theta, GRB_MINIMIZE);
 }
 
 void Master::addCut(SlaveSolution &slaveSol) {
@@ -104,6 +96,6 @@ void Master::addCut(SlaveSolution &slaveSol) {
       cut += x.at(t, c) * ConfigurationCExcess;
     }
   }
-  model.addConstr(theta >= cut);
-  model.update();
+  master_model.addConstr(theta >= cut);
+  master_model.update();
 }

@@ -2,116 +2,104 @@
 #include "Master.h"
 
 Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
-    : T(data.grid.getNTimeslots()), env(env), solution(sol), model(env),
-      data(data), e(data.sectors.size(), T),
-      y(data.grid.getNCols() * data.grid.getNRows(), T),
-      z(data.sectors.size(), T) {
-  // creo modello slave
+    : T(data.grid.getNTimeslots()), env(env), solution(sol), slave_model(env),
+      data(data), p(T, data.flows.size()), q(T, data.airblocks.size()),
+      Q(T, data.sectors.size()), e(T, data.sectors.size()),
+      E(T, data.configurations.size()), w(T, data.sectors.size()) {
 
-  // variabile y: variabile binaria che indica se si verifica effettivamente
-  // maltempo nell’airblock k nell’intervallo t
-  for (int a = 0; a < data.grid.getNCols() * data.grid.getNRows(); a++) {
-    for (int t = 0; t < T; t++) {
-      string name = "y_" + to_string(a) + "_" + to_string(t);
-      y.at(a, t) = model.addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
+  // Variabili
+  for (int t = 0; t < T; t++) {
+    for (int f = 0; f < data.flows.size(); f++) {
+      string p_name = "p_" + to_string(t) + "_" + to_string(f);
+      p.at(t, f) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                      p_name); // 6.50
+    }
+    for (int a = 0; a < data.airblocks.size(); a++) {
+      string q_name = "q_" + to_string(t) + "_" + to_string(a);
+      q.at(t, a) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                      q_name); // 6.51
+    }
+    for (int s = 0; s < data.sectors.size(); s++) {
+      string Q_name = "Q_" + to_string(t) + "_" + to_string(s);
+      string e_name = "e_" + to_string(t) + "_" + to_string(s);
+      string w_name = "w_" + to_string(t) + "_" + to_string(s);
+      Q.at(t, s) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                      Q_name); // 6.52
+      e.at(t, s) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                      e_name); // 6.52
+      w.at(t, s) =
+          slave_model.addVar(0.0, 1.0, 0.0, GRB_BINARY, w_name); // 6.54
+    }
+    for (int c = 0; c < data.configurations.size(); c++) {
+      string E_name = "E_" + to_string(t) + "_" + to_string(c);
+      E.at(t, c) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                      E_name); // 6.53
     }
   }
-
-  // variabile z: zi,t = 1 se e solo se ce eccesso nel settore i nell’intervallo
-  // t
-
-  for (int s = 0; s < data.sectors.size(); s++) {
-    for (int t = 0; t < T; t++) {
-      string name = "z_" + to_string(s) + "_" + to_string(t);
-      z.at(s, t) = model.addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
-    }
-  }
-
-  // variabile e: eccesso settore i tempo t
-
-  for (int s = 0; s < data.sectors.size(); s++) {
-    for (int t = 0; t < T; t++) {
-      string name = "e" + to_string(s) + "_" + to_string(t);
-      e.at(s, t) = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, name);
-    }
-  }
-
-  // vincoli che modellano e
-
-  double wSum = data.grid.w[data.grid.w.size() - 1]; // somma dei pesi w
-  for (int s = 0; s < data.sectors.size(); s++) {
-    for (int t = 0; t < T; t++) {
-      // double
-      // M=data.sectors[s].getTraffic(t)+(data.sectors[s].getCapacity(t))+wSum;
-      // //big M per il vincolo 5.37
-      double M =
-          data.sectors[s].getTraffic(t) + data.sectors[s].getCapacity(t) * 2.0;
-      model.addConstr(e.at(s, t) >= f(s, t, y)); // vincolo 5.35
-      model.addConstr(e.at(s, t) >= 0);          // vincolo 5.36
-      model.addConstr(e.at(s, t) <=
-                      f(s, t, y) + M * (1 - z.at(s, t))); // vincolo 5.37
-      model.addConstr(e.at(s, t) <= M * z.at(s, t));      // vincolo 5.38
-    }
-  }
-
-  const int NUM_P_LEVELS = 3;
-
-  int totalAirblocks = data.grid.getNCols() * data.grid.getNRows();
 
   for (int t = 0; t < T; t++) {
-    for (int p = 1; p <= NUM_P_LEVELS; p++) {
+    for (int f = 0; f < data.flows.size(); f++) {
+      GRBLinExpr sum_left = 0;
+      GRBLinExpr sum_right = 0;
+      for (int tao = 0; tao < t; t++) {
 
-      GRBLinExpr sum_y = 0.0;
-      int count_p = 0; // Conta quanti airblock hanno pressione p al tempo t
-
-      for (int a = 0; a < totalAirblocks; a++) {
-        if (data.grid.airBlock(a).getplevel(t) == p) {
-          sum_y += y.at(a, t);
-          count_p++;
-        }
+        sum_left += p.at(tao, f);
+        sum_right += data.flows[f].getScheduledDepartures(tao);
       }
-
-      if (count_p > 0) {
-
-        double rhs = data.grid.pi[p - 1] * count_p;
-
-        model.addConstr(sum_y <= rhs);
-      }
+      slave_model.addConstr(sum_left <= sum_right); // vincolo 6.43
     }
   }
 
-  // vincolo 5.40
-  for (int a = 0; a < data.grid.getNCols() * data.grid.getNRows(); a++) {
-    for (int t = 0; t < T; t++) {
-      if (data.grid.airBlock(a).getglevel(t) == 1 &&
-          data.grid.airBlock(a).getplevel(t) == 1) {
-        model.addConstr(y.at(a, t) == 0.0); // vincolo 5.40
+  for (int t = 0; t < T; t++) {
+    for (int a = 0; a < data.airblocks.size(); a++) {
+      GRBLinExpr sum = 0;
+      for (int f = 0; f < data.airblocks[a].getFlows().size(); f++) {
+        for (int tao = data.flows[f].tao_f_a(t, a);
+             tao <= t - data.flows[f].getTimeToReachAirBlock(a); tao++) {
+          sum += p.at(tao, f);
+        }
       }
+      slave_model.addConstr(q.at(t, a) == sum); // vincolo 6.44
+    }
+  }
+
+  for (int t = 0; t < T; t++) {
+    for (int s = 0; s < data.sectors.size(); s++) {
+      GRBLinExpr sum = 0;
+      for (int tao = t; tao < t + (60 / data.PERIOD_LENGTH) - 1; tao++) {
+        for (int a = 0; a < data.sectors[s].getNAirblocks(); a++) {
+          sum += q.at(tao, a);
+        }
+      }
+      slave_model.addConstr(Q.at(t, s) == sum); // vincolo 6.45
+    }
+  }
+
+  int M = 1000000; // TODO: può essere ottimizzato
+
+  for (int t = 0; t < T; t++) {
+    for (int s = 0; s < data.sectors.size(); s++) {
+      slave_model.addConstr(e.at(t, s) <= M * w.at(t, s)); // vincolo 6.46
+      slave_model.addConstr(e.at(t, s) <=
+                            Q.at(t, s) - data.sectors[s].getCapacity(t) +
+                                M * (1 - w.at(t, s))); // vincolo 6.47
+      slave_model.addConstr(e.at(t, s) >=
+                            Q.at(t, s) -
+                                data.sectors[s].getCapacity(t)); // vincolo 6.48
+    }
+  }
+
+  for (int t = 0; t < T; t++) {
+    for (int c = 0; c < data.configurations.size(); c++) {
+      GRBLinExpr sum = 0;
+      for (int s = 0; s < data.configurations[c].sectors.size(); s++) {
+        sum += e.at(t, s);
+      }
+      slave_model.addConstr(E.at(t, c) == sum); // vincolo 6.49
     }
   }
 
   constructObjective();
-}
-
-GRBLinExpr Slave::f(int i, int t,
-                    Matrix<GRBVar> &y) { // indice i = settore, t = tempo
-  double traffic = data.sectors[i].getTraffic(t);
-  double capacity = data.sectors[i].getCapacity(t);
-
-  // frazione di capacità per singolo airblock
-  double fraction =
-      data.sectors[i].getCapacity(t) / data.sectors[i].getNAirblocks();
-  // somma pesata del meteo sugli airblock del settore
-  GRBLinExpr media = 0.0;
-  for (int a = 0; a < data.sectors[i].getNAirblocks(); a++) {
-    int glevel = data.sectors[i].airblocks[a]->getglevel(t);
-    media += y.at(data.sectors[i].airblocks[a]->getIndex(), t) *
-             data.grid.w[glevel - 1];
-  }
-
-  media = fraction * media;
-
-  return (traffic - capacity) + media;
 }
 
 void Slave::constructObjective() {
@@ -127,7 +115,7 @@ void Slave::constructObjective() {
     }
   }
 
-  model.setObjective(sum, GRB_MAXIMIZE);
+  slave_model.setObjective(sum, GRB_MAXIMIZE);
   obj = sum;
 }
 
@@ -137,8 +125,8 @@ void Slave::update(MasterSolution &s) {
 }
 
 SlaveSolution Slave::solve() {
-  model.optimize();
-  SlaveSolution slaveSol(model.get(GRB_DoubleAttr_ObjVal), e);
+  slave_model.optimize();
+  SlaveSolution slaveSol(slave_model.get(GRB_DoubleAttr_ObjVal), e);
   return slaveSol;
 }
 

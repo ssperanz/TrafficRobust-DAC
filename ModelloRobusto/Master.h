@@ -36,7 +36,7 @@ public:
 
 class Master {
   GRBEnv env;
-  GRBModel model;
+  GRBModel master_model;
   DACData data;
 
   std::vector<SlaveSolution> realizations;
