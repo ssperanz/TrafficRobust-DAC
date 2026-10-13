@@ -1,405 +1,338 @@
-#include <iostream>
-#include <vector>
+#include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <random>
 #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <algorithm>
+#include <vector>
 
-#include "generate_dac_data.h"
 #include "Matrix.h"
+#include "generate_dac_data.h"
 
+void AirBlock::setglevel(int t, int g) { gLevel[t] = g; }
 
+void AirBlock::setplevel(int t, int p) { pLevel[t] = p; }
 
+int AirBlock::getIndex() { return index; }
 
-void AirBlock::setglevel(int t, int g) {
-    gLevel[t]=g;
-}
+int AirBlock::getplevel(int t) { return pLevel[t]; }
 
+int AirBlock::getglevel(int t) { return gLevel[t]; }
 
-void AirBlock::setplevel(int t, int p) {
-    pLevel[t]=p;
-}
-
-int AirBlock::getIndex() {
-    return index;
-}
-
-int AirBlock::getplevel(int t) {
-    return pLevel[t];
-}
-
-int AirBlock::getglevel(int t) {
-    return gLevel[t];
-}
-
-//versione con timeslot
+// versione con timeslot
 
 //  void AirBlock::setTraffic(TimeSlot& time, double traff){
 //     traffic[time.id]=traff;
 // }
 
-void AirBlock::setTraffic(int time, double traff){
-     traffic[time]=traff;
-}
+void AirBlock::setTraffic(int time, double traff) { traffic[time] = traff; }
 
-
-double AirBlock::getTraffic(int t) {
-    return traffic[t];
-}
+double AirBlock::getTraffic(int t) { return traffic[t]; }
 
 // SECTOR
 
 double Sector::getTraffic(int t) {
-    double sum=0.0;
-    for(int a=0; a<airblocks.size(); a++) {
-        sum += airblocks[a]->getTraffic(t);
-    }
-    return sum;
+  double sum = 0.0;
+  for (int a = 0; a < airblocks.size(); a++) {
+    sum += airblocks[a]->getTraffic(t);
+  }
+  return sum;
 }
 
-double Sector::getCapacity(int t) {
-    return capacity[t];
-}
+double Sector::getCapacity(int t) { return capacity[t]; }
 
-int Sector::getNAirblocks() {
-    return airblocks.size();
-}
+int Sector::getNAirblocks() { return airblocks.size(); }
 
-void Sector::setCapacity(std::vector<double> cap) {
-    capacity=cap;
-}
+void Sector::setCapacity(std::vector<double> cap) { capacity = cap; }
 
 int Sector::getExcess(int t) {
-    double total=0.0;
-    for(int a=0; a<airblocks.size(); a++) {
-        total += airblocks[a]->getTraffic(t);
-    }
-    return std::max(0.0, total - capacity[t]);
+  double total = 0.0;
+  for (int a = 0; a < airblocks.size(); a++) {
+    total += airblocks[a]->getTraffic(t);
+  }
+  return std::max(0.0, total - capacity[t]);
 }
 
-int Sector::getIndex() {
-    return index;
-}
+int Sector::getIndex() { return index; }
 
 //  CONFIGURATION
 
 int Configuration::getExcess(int t) {
-    double total=0.0;
-    for(int s=0; s<sectors.size(); s++) {
-        total+=sectors[s]->getExcess(t);
-    }
-    return total;
+  double total = 0.0;
+  for (int s = 0; s < sectors.size(); s++) {
+    total += sectors[s]->getExcess(t);
+  }
+  return total;
 }
 
-bool Configuration::checkSimilarity(Configuration& c2) {
-    int intersection=0;
-    for(int s1=0; s1<sectors.size(); s1++) {
-        for(int s2=0; s2<c2.sectors.size(); s2++) {
-            if(sectors[s1]->getIndex()==c2.sectors[s2]->getIndex()) {
-                intersection++;
-            }
-        }
+bool Configuration::checkSimilarity(Configuration &c2) {
+  int intersection = 0;
+  for (int s1 = 0; s1 < sectors.size(); s1++) {
+    for (int s2 = 0; s2 < c2.sectors.size(); s2++) {
+      if (sectors[s1]->getIndex() == c2.sectors[s2]->getIndex()) {
+        intersection++;
+      }
     }
-    int setUnion = sectors.size() + c2.sectors.size() - intersection;
-    if(setUnion>0) {
-        double result=static_cast<double>(intersection)/setUnion;
-        if(result>=0.50) {
-            return true;
-        } else {
-            return false;
-        }
+  }
+  int setUnion = sectors.size() + c2.sectors.size() - intersection;
+  if (setUnion > 0) {
+    double result = static_cast<double>(intersection) / setUnion;
+    if (result >= 0.50) {
+      return true;
     } else {
-        return false;
+      return false;
     }
-    
+  } else {
+    return false;
+  }
 }
 
 // GRID
 
-int Grid::getNRows() const {
-    return m_rows;
+int Grid::getNRows() const { return m_rows; }
+
+int Grid::getNCols() const { return m_cols; }
+
+AirBlock &Grid::airBlock(int id) { return m_airBlocks[id]; }
+
+AirBlock &Grid::airBlock(int row, int col) {
+  return m_airBlocks[row * m_cols + col];
 }
 
-int Grid::getNCols() const {
-    return m_cols;
+int Grid::getNTimeslots() { return m_time.size(); }
+
+int Grid::geth() { return h; }
+
+Grid::Grid(int rows, int cols, const TimeHorizon &time, int h)
+    : m_rows(rows), m_cols(cols), m_time(time), h(h) {
+  int id = 0;
+
+  for (int r = 0; r < rows; ++r)
+    for (int c = 0; c < cols; ++c)
+      m_airBlocks.emplace_back(id++, r, c, time.size());
 }
 
-AirBlock& Grid::airBlock(int id)
-{
-    return m_airBlocks[id];
-}
+Grid DACData::readGrid(const std::string &filename) {
+  // SEZIONE DA MODIFICARE deve leggere quanto dura lo slot di tempo e quanti
+  // slot sono da file
+  std::ifstream in(filename);
 
-AirBlock& Grid::airBlock(int row, int col)
-{
-    return m_airBlocks[row * m_cols + col];
-}
+  if (!in)
+    throw std::runtime_error("Cannot open file.");
 
-int Grid::getNTimeslots()
-{
-    return m_time.size();
-}
+  std::string line;
+  std::string section;
 
-int Grid::geth()
-{
-    return h;
-}
+  TimeHorizon time(0, 0);
+  time.slots.clear();
 
-Grid::Grid(int rows, int cols, const TimeHorizon& time, int h)
-    : m_rows(rows), m_cols(cols), m_time(time), h(h)
-{
-    int id = 0;
+  int rows = 0;
+  int cols = 0;
+  int h = 0;
 
-    for (int r = 0; r < rows; ++r)
-        for (int c = 0; c < cols; ++c)
-            m_airBlocks.emplace_back(id++, r, c, time.size()); 
-}
+  while (std::getline(in, line)) {
+    line = trim(line);
 
+    if (line.empty())
+      continue;
 
+    if (line[0] == '[') {
+      section = line;
+      std::getline(in, line); // salta intestazione
+      continue;
+    }
 
-Grid DACData::readGrid(const std::string& filename)
-{
-    // SEZIONE DA MODIFICARE deve leggere quanto dura lo slot di tempo e quanti slot sono da file
-    std::ifstream in(filename);
+    else if (section == "[TIME]") {
+      std::cout << "Lettura TIME" << std::endl;
+      auto f = split(line, ',');
 
-    if (!in)
-        throw std::runtime_error("Cannot open file.");
+      int id = stoi(f[0]);
 
-    std::string line;
-    std::string section;
-
-    TimeHorizon time(0,0);
-    time.slots.clear();
-
-    int rows = 0;
-    int cols = 0;
-    int h = 0;
-
-    while (std::getline(in, line))
-    {
-        line = trim(line);
-
-        if (line.empty())
-            continue;
-
-        if (line[0] == '[')
-        {
-            section = line;
-            std::getline(in, line);   // salta intestazione
-            continue;
-        }
-
-        else if(section == "[TIME]")
-{
-    std::cout << "Lettura TIME" << std::endl;
-    auto f = split(line, ',');
-
-    int id = stoi(f[0]);
-
-    // Converte HH:MM in minuti dalla mezzanotte
-    auto parseTime = [](const std::string& time) -> int
-    {
+      // Converte HH:MM in minuti dalla mezzanotte
+      auto parseTime = [](const std::string &time) -> int {
         auto parts = split(time, ':');
 
-        int hour   = stoi(parts[0]);
+        int hour = stoi(parts[0]);
         int minute = stoi(parts[1]);
 
         return hour * 60 + minute;
-    };
+      };
 
-    int start = parseTime(f[1]);
-    int end   = parseTime(f[2]);
+      int start = parseTime(f[1]);
+      int end = parseTime(f[2]);
 
-    time.slots.emplace_back(id, start, end);
-    std::cout << "Slot temporale: " << id << " (" << start << " - " << end << ")" << std::endl;
-}
-        else if (section == "[GRID]")
-        {
-            std::cout << "Lettura GRID" << std::endl;
-            auto f = split(line, ',');
+      time.slots.emplace_back(id, start, end);
+      std::cout << "Slot temporale: " << id << " (" << start << " - " << end
+                << ")" << std::endl;
+    } else if (section == "[GRID]") {
+      std::cout << "Lettura GRID" << std::endl;
+      auto f = split(line, ',');
 
-            rows = std::stoi(f[0]);
-            cols = std::stoi(f[1]);
-            h    = std::stoi(f[2]);
-        }
+      rows = std::stoi(f[0]);
+      cols = std::stoi(f[1]);
+      h = std::stoi(f[2]);
     }
+  }
 
-    return Grid(rows, cols, time, h);
+  return Grid(rows, cols, time, h);
 }
 
-int DACData::getNConfigurations() {
-    return configurations.size();
-}
+int DACData::getNConfigurations() { return configurations.size(); }
 
-std::vector<int> DACData::getSimilarConfigurationsIndex(Configuration& c1) {
-    // algoritmo: rapporto tra settori in comune e insieme dei settori della configurazione c e c'
-    std::vector<int> similarIndex;
-    for(int c2=0; c2<configurations.size(); c2++) {
-        if(c1.checkSimilarity(configurations[c2])) {
-            similarIndex.push_back(c2);
-        }
+std::vector<int> DACData::getSimilarConfigurationsIndex(Configuration &c1) {
+  // algoritmo: rapporto tra settori in comune e insieme dei settori della
+  // configurazione c e c'
+  std::vector<int> similarIndex;
+  for (int c2 = 0; c2 < configurations.size(); c2++) {
+    if (c1.checkSimilarity(configurations[c2])) {
+      similarIndex.push_back(c2);
     }
-    return similarIndex;
-
+  }
+  return similarIndex;
 }
 
-
-
-DACData::DACData(const std::string& filename): grid(readGrid(filename)), epsilon(1e-4) {
-    std::cout<<"finito llettura griglia"<<std::endl;
-    readRest(filename);
+DACData::DACData(const std::string &filename)
+    : grid(readGrid(filename)), epsilon(1e-4) {
+  std::cout << "finito llettura griglia" << std::endl;
+  readRest(filename);
 }
-std::string DACData::trim(std::string s)
-{
-    while (!s.empty() && isspace(s.front()))
-        s.erase(s.begin());
+std::string DACData::trim(std::string s) {
+  while (!s.empty() && isspace(s.front()))
+    s.erase(s.begin());
 
-    while (!s.empty() && isspace(s.back()))
-        s.pop_back();
+  while (!s.empty() && isspace(s.back()))
+    s.pop_back();
 
-    if (!s.empty() && s.front() == '"')
-        s.erase(s.begin());
+  if (!s.empty() && s.front() == '"')
+    s.erase(s.begin());
 
-    if (!s.empty() && s.back() == '"')
-        s.pop_back();
+  if (!s.empty() && s.back() == '"')
+    s.pop_back();
 
-    return s;
+  return s;
 }
 
-std::vector<std::string> DACData::split(const std::string& s, char sep)
-{
-    std::vector<std::string> out;
-    std::string token;
-    std::stringstream ss(s);
-    std::vector<std::vector<double>> capacities;
+std::vector<std::string> DACData::split(const std::string &s, char sep) {
+  std::vector<std::string> out;
+  std::string token;
+  std::stringstream ss(s);
+  std::vector<std::vector<double>> capacities;
 
-    while(getline(ss, token, sep))
-        out.push_back(trim(token));
+  while (getline(ss, token, sep))
+    out.push_back(trim(token));
 
-    return out;
+  return out;
 }
 
+void DACData::readRest(const std::string &filename) {
+  std::ifstream in(filename);
 
-void DACData::readRest(const std::string& filename)  {
-    std::ifstream in(filename);
+  if (!in)
+    throw std::runtime_error("Cannot open file.");
 
-    if(!in)
-        throw std::runtime_error("Cannot open file.");
+  //--------------------------------------------------
+  // Variabili temporanee
+  //--------------------------------------------------
+
+  std::string line;
+  std::string section;
+
+  Matrix<double> *capPtr = NULL;
+
+  while (getline(in, line)) {
+    line = trim(line);
+
+    if (line.empty())
+      continue;
+
+    if (line[0] == '[') {
+      section = line;
+      getline(in, line); // salta intestazione
+      continue;
+    }
 
     //--------------------------------------------------
-    // Variabili temporanee
+    // AIRBLOCK DATA
     //--------------------------------------------------
 
-    std::string line;
-    std::string section;
+    else if (section == "[AIRBLOCKS]") {
+      auto f = split(line, ',');
 
-    Matrix<double>* capPtr=NULL;
+      int block = stoi(f[0]);
+      int t = stoi(f[1]);
+      double tr = stod(f[2]);
+      int p = stoi(f[3]);
+      int g = stoi(f[4]);
 
-    while(getline(in,line))
-    {
-        line = trim(line);
+      AirBlock &b = grid.airBlock(block);
 
-        if(line.empty())
-            continue;
-
-        if(line[0]=='[')
-        {
-            section = line;
-            getline(in,line);     // salta intestazione
-            continue;
-        }        
-
-        //--------------------------------------------------
-        // AIRBLOCK DATA
-        //--------------------------------------------------
-
-        else if(section=="[AIRBLOCKS]")
-        {
-            auto f = split(line, ',');
-
-            int block = stoi(f[0]);
-            int t     = stoi(f[1]);
-            double tr = stod(f[2]);
-            int p     = stoi(f[3]);
-            int g     = stoi(f[4]);
-
-            AirBlock& b = grid.airBlock(block);
-
-            b.setTraffic(t, tr);
-            b.setplevel(t, p);
-            b.setglevel(t, g);
-        }
-
-        //--------------------------------------------------
-        // SECTORS
-        //--------------------------------------------------
-
-        else if(section=="[SECTORS]")
-        {
-            auto f = split(line, ',');
-
-            int id = stoi(f[0]);
-
-            std::vector<AirBlock*> blocks;
-
-            std::vector<std::string> airIds = split(f[1], ';');
-
-            for (std::string& s : airIds)
-            {
-                int blockId = stoi(s);
-
-                AirBlock* b = &grid.airBlock(blockId);
-
-                blocks.push_back(b);
-            }
-            
-            sectors.push_back(Sector(id, blocks));
-        }
-
-
-        else if(section=="[CAPACITY]")
-        {
-        auto f = split(line, ',');
-
-        int sectorId = stoi(f[0]);
-        int t = stoi(f[1]);
-        double cap = stod(f[2]);
-        if(capPtr==NULL) {
-            capPtr=new Matrix<double>(sectors.size(), grid.getNTimeslots());
-        }
-        capPtr->set(sectorId, t, cap);
-        }
-
-        //--------------------------------------------------
-        // CONFIGURATIONS
-        //--------------------------------------------------
-
-        else if(section=="[CONFIGURATIONS]")
-        {
-            auto f = split(line, ',');
-
-            int id = stoi(f[0]);
-
-            std::vector<Sector*> configSectors;
-
-            std::vector<std::string> secIds = split(f[1], ';');
-
-            for (std::string& s : secIds)
-            {
-                int sectorId = stoi(s);
-
-                Sector* b = &(sectors[sectorId]);
-
-                configSectors.push_back(b);
-            }
-            configurations.push_back(Configuration(id, configSectors));
-        }
+      b.setTraffic(t, tr);
+      b.setplevel(t, p);
+      b.setglevel(t, g);
     }
-    for (size_t i = 0; i < sectors.size(); ++i)
-        {
-        sectors[i].setCapacity(capPtr->getLine(i));
-        }
-}
 
+    //--------------------------------------------------
+    // SECTORS
+    //--------------------------------------------------
+
+    else if (section == "[SECTORS]") {
+      auto f = split(line, ',');
+
+      int id = stoi(f[0]);
+
+      std::vector<AirBlock *> blocks;
+
+      std::vector<std::string> airIds = split(f[1], ';');
+
+      for (std::string &s : airIds) {
+        int blockId = stoi(s);
+
+        AirBlock *b = &grid.airBlock(blockId);
+
+        blocks.push_back(b);
+      }
+
+      sectors.push_back(Sector(id, blocks));
+    }
+
+    else if (section == "[CAPACITY]") {
+      auto f = split(line, ',');
+
+      int sectorId = stoi(f[0]);
+      int t = stoi(f[1]);
+      double cap = stod(f[2]);
+      if (capPtr == NULL) {
+        capPtr = new Matrix<double>(sectors.size(), grid.getNTimeslots());
+      }
+      capPtr->set(sectorId, t, cap);
+    }
+
+    //--------------------------------------------------
+    // CONFIGURATIONS
+    //--------------------------------------------------
+
+    else if (section == "[CONFIGURATIONS]") {
+      auto f = split(line, ',');
+
+      int id = stoi(f[0]);
+
+      std::vector<Sector *> configSectors;
+
+      std::vector<std::string> secIds = split(f[1], ';');
+
+      for (std::string &s : secIds) {
+        int sectorId = stoi(s);
+
+        Sector *b = &(sectors[sectorId]);
+
+        configSectors.push_back(b);
+      }
+      configurations.push_back(Configuration(id, configSectors));
+    }
+  }
+  for (size_t i = 0; i < sectors.size(); ++i) {
+    sectors[i].setCapacity(capPtr->getLine(i));
+  }
+}
