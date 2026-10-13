@@ -89,6 +89,46 @@ bool Configuration::checkSimilarity(Configuration &c2) {
   }
 }
 
+// FLOW
+
+int Flow::getId() { return id; }
+
+std::vector<AirBlock *> Flow::getAirBlocks() { return airblocks; }
+
+std::vector<Flow *> Flow::getFlowsThroughAirBlock(std::vector<Flow *> flows,
+                                                  AirBlock *ab) {
+  std::vector<Flow *> flows_through_ab;
+  for (int i = 0; i < flows.size(); i++) {
+    Flow *flow = flows[i];
+    for (int j = 0; j < flow->getAirBlocks().size(); j++) {
+      if (flow->getAirBlocks()[j] == ab) {
+        flows_through_ab.push_back(flow);
+        break;
+      }
+    }
+  }
+  return flows_through_ab;
+}
+
+int Flow::getTimeToReachAirBlock(int ab_index) {
+  if (ab_index < 0 || ab_index >= time_toreach_airblock.size()) {
+    throw std::out_of_range("Invalid airblock index");
+  }
+  return time_toreach_airblock[ab_index];
+}
+
+int Flow::getTimeThroughAirBlock(int ab_index) {
+  if (ab_index < 0 || ab_index >= time_through_airblock.size()) {
+    throw std::out_of_range("Invalid airblock index");
+  }
+  return time_through_airblock[ab_index];
+}
+
+int Flow::tao_f_a(int t, int ab_index) {
+  return std::max(0, t - getTimeToReachAirBlock(ab_index) -
+                         getTimeThroughAirBlock(ab_index) + 1);
+}
+
 // GRID
 
 int Grid::getNRows() const { return m_rows; }

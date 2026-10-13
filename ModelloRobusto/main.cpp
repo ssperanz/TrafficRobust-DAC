@@ -21,7 +21,7 @@ int main() {
     std::cout << "Dati DAC generati e salvati in path.csv" << std::endl;
 
     GRBEnv env(true);
-    env.set("LogFile", "robusto.log");
+    env.set("LogFile", "TrafficRobust-DAC.log");
     std::cout << "Inizializzazione ambiente Gurobi..." << std::endl;
     env.start();
 

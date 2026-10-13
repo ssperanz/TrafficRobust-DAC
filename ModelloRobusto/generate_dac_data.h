@@ -92,6 +92,38 @@ public:
                         // all'intervallo temporale t
 };
 
+class Flow {
+private:
+  int id;
+  std::vector<AirBlock *> airblocks;
+  std::vector<int> time_toreach_airblock; // time_toreach_airblock[i] indica il
+                                          // tempo necessario per raggiungere
+                                          // l'airblock i del flusso
+  std::vector<int> time_through_airblock; // time_through_airblock[i] indica il
+                                          // tempo necessario per attraversare
+                                          // l'airblock i del flusso
+  std::vector<int>
+      scheduled_departures; // scheduled_departures[time] indica il numero di
+                            // partenze programmate per il timeslot time
+
+public:
+  Flow(int id, std::vector<AirBlock *> ab, std::vector<int> time_to_reach,
+       std::vector<int> time_through, std::vector<int> scheduled_departures)
+      : id(id), airblocks(ab), time_toreach_airblock(time_to_reach),
+        time_through_airblock(time_through),
+        scheduled_departures(scheduled_departures) {}
+  int getId();
+  std::vector<AirBlock *> getAirBlocks();
+  static std::vector<Flow *> getFlowsThroughAirBlock(std::vector<Flow *> flows,
+                                                     AirBlock *ab);
+  int getTimeToReachAirBlock(int ab_index);
+  int getTimeThroughAirBlock(int ab_index);
+  int tao_f_a(int t,
+              int ab_index); // the earliest entry time in airspace block 'a' of
+                             // aircraft in flow 'f' that are still in airspace
+                             // block 'a' at time 't'.
+};
+
 class Grid {
 public:
   Grid(int rows, int cols, const TimeHorizon &time, int h);
