@@ -14,8 +14,7 @@ using namespace std;
 
 int main() {
   try {
-    // std::cout << "Generazione dati DAC..." << std::endl;
-    // generateDACCSV("path.csv", 8); //10
+    std::cout << "Generazione dati DAC..." << std::endl;
     DACCSVGenerator generator(20, 20, 15, 100, 20);
     generator.generateDACCSV("path.csv", 8);
     std::cout << "Dati DAC generati e salvati in path.csv" << std::endl;
@@ -46,7 +45,7 @@ int main() {
       sol = master.solve();
       slave.update(sol);
 
-      cout << "risoluzione slave" << endl;
+      cout << "Risoluzione slave" << endl;
       SlaveSolution slaveSol = slave.solve();
       double max_excess = slaveSol.excess;
       if (max_excess - sol.theta <= data.epsilon) {

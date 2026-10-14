@@ -6,8 +6,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
       data(data), p(T, data.flows.size()), q(T, data.airblocks.size()),
       Q(T, data.sectors.size()), e(T, data.sectors.size()),
       E(T, data.configurations.size()), w(T, data.sectors.size()) {
-
-  // Variabili
+  // std::cout << "Costruzione modello slave..." << std::endl;
+  //  Variabili
   for (int t = 0; t < T; t++) {
     for (int f = 0; f < data.flows.size(); f++) {
       string p_name = "p_" + to_string(t) + "_" + to_string(f);
@@ -37,11 +37,13 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
     }
   }
 
+  // std::cout << "Aggiunti vincoli 6.50-6.54" << std::endl;
+
   for (int t = 0; t < T; t++) {
     for (int f = 0; f < data.flows.size(); f++) {
       GRBLinExpr sum_left = 0;
       GRBLinExpr sum_right = 0;
-      for (int tao = 0; tao < t; t++) {
+      for (int tao = 0; tao <= t; tao++) {
 
         sum_left += p.at(tao, f);
         sum_right += data.flows[f].getScheduledDepartures(tao);
@@ -49,6 +51,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
       slave_model.addConstr(sum_left <= sum_right); // vincolo 6.43
     }
   }
+
+  // std::cout << "Aggiunti vincoli 6.43" << std::endl;
 
   for (int t = 0; t < T; t++) {
     for (int a = 0; a < data.airblocks.size(); a++) {
@@ -63,6 +67,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
     }
   }
 
+  // std::cout << "Aggiunti vincoli 6.44" << std::endl;
+
   for (int t = 0; t < T; t++) {
     for (int s = 0; s < data.sectors.size(); s++) {
       GRBLinExpr sum = 0;
@@ -74,6 +80,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
       slave_model.addConstr(Q.at(t, s) == sum); // vincolo 6.45
     }
   }
+
+  // std::cout << "Aggiunti vincoli 6.45" << std::endl;
 
   int M = 1000000; // TODO: può essere ottimizzato
 
@@ -89,6 +97,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
     }
   }
 
+  // std::cout << "Aggiunti vincoli 6.46-6.48" << std::endl;
+
   for (int t = 0; t < T; t++) {
     for (int c = 0; c < data.configurations.size(); c++) {
       GRBLinExpr sum = 0;
@@ -99,6 +109,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
     }
   }
 
+  // std::cout << "Aggiunti vincoli 6.49" << std::endl;
+
   constructObjective();
 }
 
@@ -108,7 +120,7 @@ void Slave::constructObjective() {
     for (int c = 0; c < solution.x.getncols(); c++) {
       GRBLinExpr excess = 0.0;
       for (int i = 0; i < data.configurations[c].sectors.size(); i++) {
-        excess += e.at(data.configurations[c].sectors[i]->getIndex(), t);
+        excess += e.at(t, data.configurations[c].sectors[i]->getIndex());
       }
 
       sum += solution.x.at(t, c) * excess;

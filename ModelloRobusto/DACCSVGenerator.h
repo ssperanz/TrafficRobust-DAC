@@ -15,6 +15,8 @@ public:
                   int NSECTORS = 100, int NCONFIGS = 20);
   void generateDACCSV(const std::string &filename, unsigned int seed);
   double hourlyFactor(int t);
+  std::vector<int> generateTrajectory(int ROWS, int COLS, int TRAJ_LEN_MIN,
+                                      int TRAJ_LEN_MAX, std::mt19937 &rng);
 
 private:
   int ROWS;

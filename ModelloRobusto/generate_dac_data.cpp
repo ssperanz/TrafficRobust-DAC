@@ -140,6 +140,18 @@ int Flow::tao_f_a(int t, int ab_index) {
                          getTimeThroughAirBlock(ab_index) + 1);
 }
 
+/*int Flow::addScheduledDepartures(int time, int departures) {
+  if (time < 0 || time >= scheduled_departures.size()) {
+    throw std::out_of_range("Invalid time index");
+  }
+  scheduled_departures[time] += departures;
+  return scheduled_departures[time];
+}*/
+
+void Flow::setScheduledDepartures(std::vector<int> departures) {
+  scheduled_departures = departures;
+}
+
 // GRID
 
 int Grid::getNRows() const { return m_rows; }
@@ -291,6 +303,7 @@ void DACData::readRest(const std::string &filename) {
   std::string section;
 
   Matrix<double> *capPtr = NULL;
+  Matrix<int> *departuresPtr = NULL;
 
   while (getline(in, line)) {
     line = trim(line);
@@ -382,8 +395,63 @@ void DACData::readRest(const std::string &filename) {
       }
       configurations.push_back(Configuration(id, configSectors));
     }
+
+    else if (section == "[TRAJECTORIES]") {
+      auto f = split(line, ',');
+
+      int id = stoi(f[0]);
+
+      std::vector<AirBlock *> flowAirBlocks;
+
+      std::vector<std::string> abIds = split(f[1], ';');
+
+      for (std::string &s : abIds) {
+        int abId = stoi(s);
+
+        AirBlock *ab = &(grid.airBlock(abId));
+
+        flowAirBlocks.push_back(ab);
+      }
+
+      std::vector<int> timeToReach;
+      std::vector<int> timeThrough;
+      std::vector<int> scheduledDepartures;
+
+      std::vector<std::string> ttrValues = split(f[2], ';');
+      for (std::string &s : ttrValues) {
+        timeToReach.push_back(stoi(s));
+      }
+
+      std::vector<std::string> ttValues = split(f[3], ';');
+      for (std::string &s : ttValues) {
+        timeThrough.push_back(stoi(s));
+      }
+
+      flows.push_back(Flow(id, flowAirBlocks, timeToReach, timeThrough,
+                           scheduledDepartures));
+
+      for (AirBlock *ab : flowAirBlocks) {
+        ab->addFlow(&flows.back());
+      }
+    }
+
+    else if (section == "[DEPARTURES]") {
+      auto f = split(line, ',');
+
+      int flowId = stoi(f[0]);
+      int time = stoi(f[1]);
+      int departures = stoi(f[2]);
+
+      if (departuresPtr == NULL) {
+        departuresPtr = new Matrix<int>(flows.size(), grid.getNTimeslots());
+      }
+      departuresPtr->set(flowId, time, departures);
+    }
   }
   for (size_t i = 0; i < sectors.size(); ++i) {
     sectors[i].setCapacity(capPtr->getLine(i));
+  }
+  for (size_t i = 0; i < flows.size(); ++i) {
+    flows[i].setScheduledDepartures(departuresPtr->getLine(i));
   }
 }

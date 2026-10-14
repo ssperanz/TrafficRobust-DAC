@@ -17,6 +17,43 @@ double DACCSVGenerator::hourlyFactor(int t) {
   return 0.7 + 0.4 * std::sin(3.14159265 * t / 15.0);
 };
 
+std::vector<int> DACCSVGenerator::generateTrajectory(int ROWS, int COLS,
+                                                     int TRAJ_LEN_MIN,
+                                                     int TRAJ_LEN_MAX,
+                                                     std::mt19937 &rng) {
+  std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
+  std::uniform_int_distribution<int> lengthDist(TRAJ_LEN_MIN, TRAJ_LEN_MAX);
+  std::uniform_real_distribution<double> noise(-0.5, 0.5);
+
+  int start = startDist(rng);
+  int length = lengthDist(rng);
+
+  std::vector<int> trajectory;
+  trajectory.push_back(start);
+
+  for (int i = 1; i < length; i++) {
+    int last = trajectory.back();
+    int row = last / COLS;
+    int col = last % COLS;
+
+    double dr =
+        std::clamp(static_cast<double>(row - (start / COLS)), -1.0, 1.0) +
+        noise(rng);
+    double dc =
+        std::clamp(static_cast<double>(col - (start % COLS)), -1.0, 1.0) +
+        noise(rng);
+
+    int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
+    int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
+
+    int newBlock = newRow * COLS + newCol;
+    if (newBlock != trajectory.back())
+      trajectory.push_back(newBlock);
+  }
+
+  return trajectory;
+}
+
 void DACCSVGenerator::generateDACCSV(const std::string &filename,
                                      unsigned int seed) {
   std::mt19937 rng(seed);
@@ -26,6 +63,12 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::uniform_real_distribution<double> capacityDist(20.0, 50.0);
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
+
+  int NTRAJECTORIES = 600;
+  int TRAJ_LEN_MIN = 12;
+  int TRAJ_LEN_MAX = 28;
+  std::normal_distribution<double> ingressDist(0.6, 0.9);
+  std::normal_distribution<double> trafficVolNoise(0.8, 1.10);
 
   std::ofstream out(filename);
 
@@ -98,6 +141,8 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
     }
   }
 
+  out << "\n";
+
   //-----------------------------
   // AIRBLOCK DATA
   //-----------------------------
@@ -158,6 +203,37 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   }
 
   out << "\n";
+
+  //-----------------------------
+  // TRAJECTORIES //
+  //-----------------------------
+  out << "[TRAJECTORIES]\n";
+  out << "id,airblock,time_toreach,time_through\n";
+
+  for (int f = 0; f < NTRAJECTORIES; f++) {
+    std::vector<int> trajectory =
+        generateTrajectory(ROWS, COLS, TRAJ_LEN_MIN, TRAJ_LEN_MAX, rng);
+    for (int a = 0; a < trajectory.size(); a++) {
+      out << f << "," << trajectory[a] << "," << a << "," << 1 << "\n";
+    }
+  }
+
+  out << "\n";
+
+  //-----------------------------
+  // DEPARTURES //
+  //-----------------------------
+
+  out << "[DEPARTURES]\n";
+  out << "id,time,scheduled_departures\n";
+  for (int f = 0; f < NTRAJECTORIES; f++) {
+    for (int t = 0; t < NTIMES; t++) {
+      double baseDepartures =
+          ingressDist(rng) * hourlyFactor(t) * trafficVolNoise(rng);
+      int departures = std::max(0, static_cast<int>(baseDepartures));
+      out << f << "," << t << "," << departures << "\n";
+    }
+  }
 
   out.close();
 

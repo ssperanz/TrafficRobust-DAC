@@ -128,6 +128,7 @@ public:
               int ab_index); // the earliest entry time in airspace block 'a' of
                              // aircraft in flow 'f' that are still in airspace
                              // block 'a' at time 't'.
+  void setScheduledDepartures(std::vector<int> departures);
 };
 
 class Grid {
