@@ -11,28 +11,28 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   for (int t = 0; t < T; t++) {
     for (int f = 0; f < data.flows.size(); f++) {
       string p_name = "p_" + to_string(t) + "_" + to_string(f);
-      p.at(t, f) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+      p.at(t, f) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       p_name); // 6.50
     }
     for (int a = 0; a < data.airblocks.size(); a++) {
       string q_name = "q_" + to_string(t) + "_" + to_string(a);
-      q.at(t, a) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+      q.at(t, a) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       q_name); // 6.51
     }
     for (int s = 0; s < data.sectors.size(); s++) {
       string Q_name = "Q_" + to_string(t) + "_" + to_string(s);
       string e_name = "e_" + to_string(t) + "_" + to_string(s);
       string w_name = "w_" + to_string(t) + "_" + to_string(s);
-      Q.at(t, s) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+      Q.at(t, s) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       Q_name); // 6.52
-      e.at(t, s) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+      e.at(t, s) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       e_name); // 6.52
       w.at(t, s) =
           slave_model.addVar(0.0, 1.0, 0.0, GRB_BINARY, w_name); // 6.54
     }
     for (int c = 0; c < data.configurations.size(); c++) {
       string E_name = "E_" + to_string(t) + "_" + to_string(c);
-      E.at(t, c) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+      E.at(t, c) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       E_name); // 6.53
     }
   }
@@ -145,12 +145,12 @@ SlaveSolution Slave::solve() {
 SlaveSolution::SlaveSolution(double objVal, Matrix<GRBVar> &e_vars)
     : excess(objVal), e(e_vars.getnrows(), e_vars.getncols()) {
 
-  int nSectors = e_vars.getnrows();
-  int T = e_vars.getncols();
+  int T = e_vars.getnrows();
+  int nSectors = e_vars.getncols();
 
-  for (int s = 0; s < nSectors; s++) {
-    for (int t = 0; t < T; t++) {
-      this->e.at(s, t) = e_vars.at(s, t).get(GRB_DoubleAttr_X);
+  for (int t = 0; t < T; t++) {
+    for (int s = 0; s < nSectors; s++) {
+      this->e.at(t, s) = e_vars.at(t, s).get(GRB_DoubleAttr_X);
     }
   }
 }
