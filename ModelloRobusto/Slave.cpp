@@ -132,7 +132,7 @@ void Slave::constructObjective() {
 }
 
 void Slave::update(MasterSolution &s) {
-  solution = s;
+  slave_model.write("slave_model.lp");
   this->constructObjective();
 }
 

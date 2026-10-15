@@ -335,6 +335,10 @@ void DACData::readRest(const std::string &filename) {
       b.setTraffic(t, tr);
       b.setplevel(t, p);
       b.setglevel(t, g);
+
+      if (airblocks.size() == 0 ||
+          (airblocks.back().getIndex() != b.getIndex()))
+        airblocks.push_back(b);
     }
 
     //--------------------------------------------------
@@ -427,8 +431,10 @@ void DACData::readRest(const std::string &filename) {
         timeThrough.push_back(stoi(s));
       }
 
+      if (flows.size() == 0 || flows.back().getId() != id) {
       flows.push_back(Flow(id, flowAirBlocks, timeToReach, timeThrough,
                            scheduledDepartures));
+      }
 
       for (AirBlock *ab : flowAirBlocks) {
         ab->addFlow(&flows.back());
