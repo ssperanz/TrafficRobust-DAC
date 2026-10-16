@@ -26,7 +26,7 @@ class Slave {
   DACData data;
 
 public:
-  Slave(MasterSolution &s, GRBEnv &env, DACData data);
+  Slave(MasterSolution &s, GRBEnv &env, DACData &data);
   void constructObjective();
   SlaveSolution solve();
   void update(MasterSolution &s);

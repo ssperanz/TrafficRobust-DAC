@@ -48,7 +48,7 @@ class Master {
 
 public:
   int iter;
-  Master(DACData, GRBEnv &);
+  Master(DACData &, GRBEnv &);
   MasterSolution solve();
   // MasterSolution getActualSolution();
   void addCut(SlaveSolution &slaveSol);

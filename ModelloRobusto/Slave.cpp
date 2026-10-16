@@ -1,7 +1,7 @@
 #include "Slave.h"
 #include "Master.h"
 
-Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
+Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
     : T(data.grid.getNTimeslots()), env(env), solution(sol), slave_model(env),
       data(data), p(T, data.flows.size()), q(T, data.airblocks.size()),
       Q(T, data.sectors.size()), e(T, data.sectors.size()),
@@ -9,17 +9,20 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   // std::cout << "Costruzione modello slave..." << std::endl;
   //  Variabili
   for (int t = 0; t < T; t++) {
-    for (int f = 0; f < data.flows.size(); f++) {
+    for (Flow &flow : data.flows) {
+      int f = flow.getId();
       string p_name = "p_" + to_string(t) + "_" + to_string(f);
       p.at(t, f) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       p_name); // 6.50
     }
-    for (int a = 0; a < data.airblocks.size(); a++) {
+    for (AirBlock &ab : data.airblocks) {
+      int a = ab.getIndex();
       string q_name = "q_" + to_string(t) + "_" + to_string(a);
       q.at(t, a) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       q_name); // 6.51
     }
-    for (int s = 0; s < data.sectors.size(); s++) {
+    for (Sector &sector : data.sectors) {
+      int s = sector.getIndex();
       string Q_name = "Q_" + to_string(t) + "_" + to_string(s);
       string e_name = "e_" + to_string(t) + "_" + to_string(s);
       string w_name = "w_" + to_string(t) + "_" + to_string(s);
@@ -30,7 +33,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
       w.at(t, s) =
           slave_model.addVar(0.0, 1.0, 0.0, GRB_BINARY, w_name); // 6.54
     }
-    for (int c = 0; c < data.configurations.size(); c++) {
+    for (Configuration &config : data.configurations) {
+      int c = config.id;
       string E_name = "E_" + to_string(t) + "_" + to_string(c);
       E.at(t, c) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                       E_name); // 6.53
@@ -40,13 +44,13 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   // std::cout << "Aggiunti vincoli 6.50-6.54" << std::endl;
 
   for (int t = 0; t < T; t++) {
-    for (int f = 0; f < data.flows.size(); f++) {
+    for (Flow &flow : data.flows) {
       GRBLinExpr sum_left = 0;
       GRBLinExpr sum_right = 0;
       for (int tao = 0; tao <= t; tao++) {
 
-        sum_left += p.at(tao, f);
-        sum_right += data.flows.at(f).getScheduledDepartures(tao);
+        sum_left += p.at(tao, flow.getId());
+        sum_right += flow.getScheduledDepartures(tao);
       }
       slave_model.addConstr(sum_left <= sum_right); // vincolo 6.43
     }
@@ -55,12 +59,11 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   // std::cout << "Aggiunti vincoli 6.43" << std::endl;
 
   for (int t = 0; t < T; t++) {
-    for (int a = 0; a < data.airblocks.size(); a++) {
-      int ab_id = data.airblocks.at(a).getIndex();
+    for (AirBlock &ab : data.airblocks) {
+      int ab_id = ab.getIndex();
       GRBLinExpr sum = 0;
       vector<int> flowsid =
-          data.airblocks.at(a)
-              .getFlows(); // flussi che attraversano l’airblock a
+          ab.getFlows(); // flussi che attraversano l’airblock a
       for (int f = 0; f < flowsid.size(); f++) {
         int flowid = flowsid.at(f); //
         Flow &flow = data.flows.at(flowid);
@@ -76,14 +79,14 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   // std::cout << "Aggiunti vincoli 6.44" << std::endl;
 
   for (int t = 0; t < T; t++) {
-    for (int s = 0; s < data.sectors.size(); s++) {
+    for (Sector &sector : data.sectors) {
       GRBLinExpr sum = 0;
       for (int tao = t; tao <= t + (60 / data.PERIOD_LENGTH) - 1; tao++) {
-        for (AirBlock *ab : data.sectors.at(s).airblocks) {
+        for (AirBlock *ab : sector.airblocks) {
           sum += q.at(tao, ab->getIndex());
         }
       }
-      slave_model.addConstr(Q.at(t, s) == sum); // vincolo 6.45
+      slave_model.addConstr(Q.at(t, sector.getIndex()) == sum); // vincolo 6.45
     }
   }
 
@@ -92,7 +95,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   int M = 1000000; // TODO: può essere ottimizzato
 
   for (int t = 0; t < T; t++) {
-    for (int s = 0; s < data.sectors.size(); s++) {
+    for (Sector &sector : data.sectors) {
+      int s = sector.getIndex();
       slave_model.addConstr(e.at(t, s) <= M * w.at(t, s)); // vincolo 6.46
       slave_model.addConstr(e.at(t, s) <=
                             Q.at(t, s) - data.sectors[s].getCapacity(t) +
@@ -106,12 +110,12 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   // std::cout << "Aggiunti vincoli 6.46-6.48" << std::endl;
 
   for (int t = 0; t < T; t++) {
-    for (int c = 0; c < data.configurations.size(); c++) {
+    for (Configuration &config : data.configurations) {
       GRBLinExpr sum = 0;
-      for (int s = 0; s < data.configurations[c].sectors.size(); s++) {
-        sum += e.at(t, s);
+      for (Sector *s : config.sectors) {
+        sum += e.at(t, s->getIndex());
       }
-      slave_model.addConstr(E.at(t, c) == sum); // vincolo 6.49
+      slave_model.addConstr(E.at(t, config.id) == sum); // vincolo 6.49
     }
   }
 

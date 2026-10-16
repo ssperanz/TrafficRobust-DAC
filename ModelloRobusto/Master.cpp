@@ -10,7 +10,7 @@ MasterSolution Master::solve() {
   return solution;
 }
 
-Master::Master(DACData data, GRBEnv &env)
+Master::Master(DACData &data, GRBEnv &env)
     : T(data.grid.getNTimeslots()), C(data.getNConfigurations()), x(T, C),
       s(T, C), env(env), master_model(env), data(data), iter(0) {
   int t_p = data.grid.get_t_p();
@@ -18,8 +18,8 @@ Master::Master(DACData data, GRBEnv &env)
   // std::cout << "Costruzione modello master..." << std::endl;
   //  TODO?? 6.34 con valori nominali
 
-  for (int c = 0; c < C; c++) {
-    for (int t = 0; t < T; t++) {
+  for (int t = 0; t < T; t++) {
+    for (int c = 0; c < C; c++) {
       string x_name = "x_" + to_string(t) + "_" + to_string(c);
       string s_name = "s_" + to_string(t) + "_" + to_string(c);
       x.at(t, c) =
@@ -71,7 +71,7 @@ Master::Master(DACData data, GRBEnv &env)
     }
   }
 
-  for (int t = 0; t < T - t_p; t++) {
+  for (int t = 0; t <= T - t_p; t++) {
     GRBLinExpr sum = 0;
     for (int tao = t; tao <= min(t + t_p - 1, T - 1); tao++) {
       for (int c = 0; c < C; c++) {
