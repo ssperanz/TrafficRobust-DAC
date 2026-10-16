@@ -31,9 +31,9 @@ void AirBlock::setTraffic(int time, double traff) { traffic[time] = traff; }
 
 double AirBlock::getTraffic(int t) { return traffic[t]; }
 
-std::vector<Flow *> AirBlock::getFlows() { return flows; }
-
-void AirBlock::addFlow(Flow *f) { flows.push_back(f); }
+std::vector<int> AirBlock::getFlows() { return flows; }
+int AirBlock::getFlow(int f) { return flows.at(f); }
+void AirBlock::addFlow(int flowId) { flows.push_back(flowId); }
 
 // SECTOR
 
@@ -51,14 +51,6 @@ int Sector::getNAirblocks() { return airblocks.size(); }
 
 void Sector::setCapacity(std::vector<double> cap) { capacity = cap; }
 
-int Sector::getExcess(int t) {
-  double total = 0.0;
-  for (int a = 0; a < airblocks.size(); a++) {
-    total += airblocks[a]->getTraffic(t);
-  }
-  return std::max(0.0, total - capacity[t]);
-}
-
 int Sector::getIndex() { return index; }
 
 //  CONFIGURATION
@@ -66,7 +58,7 @@ int Sector::getIndex() { return index; }
 int Configuration::getExcess(int t) {
   double total = 0.0;
   for (int s = 0; s < sectors.size(); s++) {
-    total += sectors[s]->getExcess(t);
+    // total += sectors[s]->getExcess(t);
   }
   return total;
 }
@@ -105,7 +97,7 @@ std::vector<Flow *> Flow::getFlowsThroughAirBlock(std::vector<Flow *> flows,
   for (int i = 0; i < flows.size(); i++) {
     Flow *flow = flows[i];
     for (int j = 0; j < flow->getAirBlocks().size(); j++) {
-      if (flow->getAirBlocks()[j] == ab) {
+      if (flow->getAirBlocks().at(j)->getIndex() == ab->getIndex()) {
         flows_through_ab.push_back(flow);
         break;
       }
@@ -114,18 +106,24 @@ std::vector<Flow *> Flow::getFlowsThroughAirBlock(std::vector<Flow *> flows,
   return flows_through_ab;
 }
 
-int Flow::getTimeToReachAirBlock(int ab_index) {
-  if (ab_index < 0 || ab_index >= time_toreach_airblock.size()) {
-    throw std::out_of_range("Invalid airblock index");
+int Flow::getTimeToReachAirBlock(int ab_id) {
+  auto it = time_toreach_airblock.find(ab_id);
+
+  if (it != time_toreach_airblock.end()) {
+    return it->second;
   }
-  return time_toreach_airblock[ab_index];
+
+  throw std::out_of_range("AirBlock ID not found in time_toreach_airblock map");
 }
 
 int Flow::getTimeThroughAirBlock(int ab_index) {
-  if (ab_index < 0 || ab_index >= time_through_airblock.size()) {
-    throw std::out_of_range("Invalid airblock index");
+  auto it = time_through_airblock.find(ab_index);
+
+  if (it != time_through_airblock.end()) {
+    return it->second;
   }
-  return time_through_airblock[ab_index];
+
+  throw std::out_of_range("AirBlock ID not found in time_through_airblock map");
 }
 
 int Flow::getScheduledDepartures(int time) {
@@ -139,14 +137,6 @@ int Flow::tao_f_a(int t, int ab_index) {
   return std::max(0, t - getTimeToReachAirBlock(ab_index) -
                          getTimeThroughAirBlock(ab_index) + 1);
 }
-
-/*int Flow::addScheduledDepartures(int time, int departures) {
-  if (time < 0 || time >= scheduled_departures.size()) {
-    throw std::out_of_range("Invalid time index");
-  }
-  scheduled_departures[time] += departures;
-  return scheduled_departures[time];
-}*/
 
 void Flow::setScheduledDepartures(std::vector<int> departures) {
   scheduled_departures = departures;
@@ -402,43 +392,36 @@ void DACData::readRest(const std::string &filename) {
 
     else if (section == "[TRAJECTORIES]") {
       auto f = split(line, ',');
+      int flowId = stoi(f[0]);
+      int airblockId = stoi(f[1]);
+      AirBlock *ab = &airblocks.at(airblockId);
+      int timeToReach = stoi(f[2]);
+      int timeThrough = stoi(f[3]);
 
-      int id = stoi(f[0]);
-
-      std::vector<AirBlock *> flowAirBlocks;
-
-      std::vector<std::string> abIds = split(f[1], ';');
-
-      for (std::string &s : abIds) {
-        int abId = stoi(s);
-
-        AirBlock *ab = &(grid.airBlock(abId));
-
-        flowAirBlocks.push_back(ab);
+      if (flows.empty() || flows.back().getId() != flowId) {
+        flows.push_back(Flow(flowId, ab, timeToReach, timeThrough));
       }
 
-      std::vector<int> timeToReach;
-      std::vector<int> timeThrough;
-      std::vector<int> scheduledDepartures;
-
-      std::vector<std::string> ttrValues = split(f[2], ';');
-      for (std::string &s : ttrValues) {
-        timeToReach.push_back(stoi(s));
+      else if (flows.back().getId() == flowId) {
+        flows.back().airblocks.push_back(ab);
+        flows.back().time_toreach_airblock.insert(
+            {ab->getIndex(), timeToReach});
+        flows.back().time_through_airblock.insert(
+            {ab->getIndex(), timeThrough});
       }
 
-      std::vector<std::string> ttValues = split(f[3], ';');
-      for (std::string &s : ttValues) {
-        timeThrough.push_back(stoi(s));
+      else {
+        throw std::runtime_error(
+            "Unexpected flow ID in [TRAJECTORIES] section");
       }
 
-      if (flows.size() == 0 || flows.back().getId() != id) {
-      flows.push_back(Flow(id, flowAirBlocks, timeToReach, timeThrough,
-                           scheduledDepartures));
+      for (auto &ab : airblocks) {
+        if (ab.getIndex() == airblockId) {
+          ab.addFlow(flowId);
+          break;
+        }
       }
 
-      for (AirBlock *ab : flowAirBlocks) {
-        ab->addFlow(&flows.back());
-      }
     }
 
     else if (section == "[DEPARTURES]") {
