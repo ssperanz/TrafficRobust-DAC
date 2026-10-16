@@ -78,9 +78,9 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
   for (int t = 0; t < T; t++) {
     for (int s = 0; s < data.sectors.size(); s++) {
       GRBLinExpr sum = 0;
-      for (int tao = t; tao < t + (60 / data.PERIOD_LENGTH) - 1; tao++) {
-        for (int a = 0; a < data.sectors.at(s).getNAirblocks(); a++) {
-          sum += q.at(tao, a);
+      for (int tao = t; tao <= t + (60 / data.PERIOD_LENGTH) - 1; tao++) {
+        for (AirBlock *ab : data.sectors.at(s).airblocks) {
+          sum += q.at(tao, ab->getIndex());
         }
       }
       slave_model.addConstr(Q.at(t, s) == sum); // vincolo 6.45

@@ -133,9 +133,9 @@ int Flow::getScheduledDepartures(int time) {
   return scheduled_departures[time];
 }
 
-int Flow::tao_f_a(int t, int ab_index) {
-  return std::max(0, t - getTimeToReachAirBlock(ab_index) -
-                         getTimeThroughAirBlock(ab_index) + 1);
+int Flow::tao_f_a(int t, int ab_id) {
+  return std::max(0, t - getTimeToReachAirBlock(ab_id) -
+                         getTimeThroughAirBlock(ab_id) + 1);
 }
 
 void Flow::setScheduledDepartures(std::vector<int> departures) {
