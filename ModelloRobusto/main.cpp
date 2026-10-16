@@ -15,8 +15,8 @@ using namespace std;
 int main() {
   try {
     std::cout << "Generazione dati DAC..." << std::endl;
-    DACCSVGenerator generator(20, 20, 15, 100, 20);
-    generator.generateDACCSV("path.csv", 8);
+    DACCSVGenerator generator(100, 100, 15, 100, 20);
+    generator.generateDACCSV("path.csv", 42);
     std::cout << "Dati DAC generati e salvati in path.csv" << std::endl;
 
     GRBEnv env(true);

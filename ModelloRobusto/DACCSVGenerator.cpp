@@ -64,7 +64,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
 
-  int NTRAJECTORIES = 600;
+  int NTRAJECTORIES = 1500;
   int TRAJ_LEN_MIN = 12;
   int TRAJ_LEN_MAX = 28;
   std::normal_distribution<double> ingressDist(0.6, 0.9);
@@ -229,7 +229,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   for (int f = 0; f < NTRAJECTORIES; f++) {
     for (int t = 0; t < NTIMES; t++) {
       double baseDepartures =
-          5 * ingressDist(rng) * hourlyFactor(t) * trafficVolNoise(rng);
+          ingressDist(rng) * hourlyFactor(t) * trafficVolNoise(rng);
       int departures = std::max(0, static_cast<int>(baseDepartures));
       out << f << "," << t << "," << departures << "\n";
     }

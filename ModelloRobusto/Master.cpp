@@ -100,7 +100,7 @@ void Master::addCut(SlaveSolution &slaveSol) {
       double ConfigurationCExcess = 0.0;
       for (int i = 0; i < data.configurations[c].sectors.size(); i++) {
         ConfigurationCExcess +=
-            slaveSol.e.at(data.configurations[c].sectors[i]->getIndex(), t);
+            slaveSol.e.at(t, data.configurations[c].sectors[i]->getIndex());
       }
       cut += x.at(t, c) * ConfigurationCExcess;
     }

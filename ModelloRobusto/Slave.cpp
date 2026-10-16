@@ -56,6 +56,7 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
 
   for (int t = 0; t < T; t++) {
     for (int a = 0; a < data.airblocks.size(); a++) {
+      int ab_id = data.airblocks.at(a).getIndex();
       GRBLinExpr sum = 0;
       vector<int> flowsid =
           data.airblocks.at(a)
@@ -63,13 +64,12 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData data)
       for (int f = 0; f < flowsid.size(); f++) {
         int flowid = flowsid.at(f); //
         Flow &flow = data.flows.at(flowid);
-        int ab_id = data.airblocks.at(a).getIndex();
         for (int tao = flow.tao_f_a(t, ab_id);
              tao <= t - flow.getTimeToReachAirBlock(ab_id); tao++) {
           sum += p.at(tao, flowid);
         }
       }
-      slave_model.addConstr(q.at(t, a) == sum); // vincolo 6.44
+      slave_model.addConstr(q.at(t, ab_id) == sum); // vincolo 6.44
     }
   }
 
