@@ -208,13 +208,13 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   // TRAJECTORIES //
   //-----------------------------
   out << "[TRAJECTORIES]\n";
-  out << "id,airblock,time_toreach,time_through\n";
+  out << "id,airblock,time_through\n";
 
   for (int f = 0; f < NTRAJECTORIES; f++) {
     std::vector<int> trajectory =
         generateTrajectory(ROWS, COLS, TRAJ_LEN_MIN, TRAJ_LEN_MAX, rng);
     for (int a = 0; a < trajectory.size(); a++) {
-      out << f << "," << trajectory[a] << "," << a << "," << 1 << "\n";
+      out << f << "," << trajectory[a] << "," << 1 << "\n";
     }
   }
 

@@ -398,17 +398,21 @@ void DACData::readRest(const std::string &filename) {
       int flowId = stoi(f[0]);
       int airblockId = stoi(f[1]);
       AirBlock *ab = &airblocks.at(airblockId);
-      int timeToReach = stoi(f[2]);
-      int timeThrough = stoi(f[3]);
-
+      int timeThrough = stoi(f[2]);
       if (flows.empty() || flows.back().getId() != flowId) {
-        flows.push_back(Flow(flowId, ab, timeToReach, timeThrough));
+        flows.push_back(Flow(flowId, ab, 0, timeThrough));
       }
 
       else if (flows.back().getId() == flowId) {
+        int prevAbId = flows.back().getAirBlocks().back()->getIndex();
         flows.back().airblocks.push_back(ab);
         flows.back().time_toreach_airblock.insert(
-            {ab->getIndex(), timeToReach});
+            {ab->getIndex(),
+             timeThrough +
+                 flows.back().time_toreach_airblock.at(
+                     prevAbId)}); // time to reach the new airblock is the sum
+                                  // of the time to reach the previous airblock
+                                  // and the time through the new airblock
         flows.back().time_through_airblock.insert(
             {ab->getIndex(), timeThrough});
       }
