@@ -59,12 +59,12 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::mt19937 rng(seed);
 
   std::uniform_int_distribution<int> blockDist(0, ROWS * COLS - 1);
-  std::uniform_int_distribution<int> sectorSizeDist(8, 30);
-  std::uniform_real_distribution<double> capacityDist(20.0, 50.0);
+  std::uniform_int_distribution<int> sectorSizeDist(2, 15);
+  std::uniform_real_distribution<double> capacityDist(15.0, 25.0);
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
 
-  int NTRAJECTORIES = 1500;
+  int NTRAJECTORIES = 90;
   int TRAJ_LEN_MIN = 12;
   int TRAJ_LEN_MAX = 28;
   std::normal_distribution<double> ingressDist(0.6, 0.9);

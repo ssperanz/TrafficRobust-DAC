@@ -73,9 +73,9 @@ Master::Master(DACData &data, GRBEnv &env)
 
   for (int t = 0; t <= T - t_p; t++) {
     GRBLinExpr sum = 0;
-    for (int tao = t; tao <= min(t + t_p - 1, T - 1); tao++) {
+    for (int tau = t; tau <= min(t + t_p - 1, T - 1); tau++) {
       for (int c = 0; c < C; c++) {
-        sum += s.at(tao, c); // 6.37
+        sum += s.at(tau, c); // 6.37
       }
     }
     master_model.addConstr(sum <= 1);

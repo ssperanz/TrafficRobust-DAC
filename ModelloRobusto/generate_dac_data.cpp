@@ -116,8 +116,8 @@ int Flow::getTimeToReachAirBlock(int ab_id) {
   throw std::out_of_range("AirBlock ID not found in time_toreach_airblock map");
 }
 
-int Flow::getTimeThroughAirBlock(int ab_index) {
-  auto it = time_through_airblock.find(ab_index);
+int Flow::getTimeThroughAirBlock(int ab_id) {
+  auto it = time_through_airblock.find(ab_id);
 
   if (it != time_through_airblock.end()) {
     return it->second;
@@ -127,19 +127,19 @@ int Flow::getTimeThroughAirBlock(int ab_index) {
 }
 
 int Flow::getScheduledDepartures(int time) {
-  if (time < 0 || time >= scheduled_departures.size()) {
+  if (time < 0 || time >= num_of_scheduled_departures.size()) {
     throw std::out_of_range("Invalid time index");
   }
-  return scheduled_departures[time];
+  return num_of_scheduled_departures[time];
 }
 
-int Flow::tao_f_a(int t, int ab_id) {
+int Flow::tau_f_a(int t, int ab_id) {
   return std::max(0, t - getTimeToReachAirBlock(ab_id) -
                          getTimeThroughAirBlock(ab_id) + 1);
 }
 
 void Flow::setScheduledDepartures(std::vector<int> departures) {
-  scheduled_departures = departures;
+  num_of_scheduled_departures = departures;
 }
 
 // GRID
@@ -250,6 +250,9 @@ DACData::DACData(const std::string &filename)
     : grid(readGrid(filename)), epsilon(1e-4) {
   std::cout << "finito lettura griglia" << std::endl;
   readRest(filename);
+  std::cout << "finito lettura file csv" << std::endl;
+  // calculate_tau_f_a();
+  std::cout << "finito calcolo indici tau_f_a" << std::endl;
 }
 std::string DACData::trim(std::string s) {
   while (!s.empty() && isspace(s.front()))

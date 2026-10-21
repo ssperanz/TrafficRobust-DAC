@@ -109,8 +109,9 @@ public:
       time_through_airblock; // mappa che associa l'indice dell'airblock al
                              // tempo necessario per attraversarlo
   std::vector<int>
-      scheduled_departures; // scheduled_departures[time] indica il numero di
-                            // partenze programmate per il timeslot time
+      num_of_scheduled_departures; // scheduled_departures[time] indica il
+  // numero di partenze programmate per il
+  // timeslot time
 
 public:
   Flow(int id, std::vector<AirBlock *> ab,
@@ -119,7 +120,7 @@ public:
        std::vector<int> scheduled_departures)
       : id(id), airblocks(ab), time_toreach_airblock(time_to_reach),
         time_through_airblock(time_through),
-        scheduled_departures(scheduled_departures) {}
+        num_of_scheduled_departures(scheduled_departures) {}
   Flow(int id, AirBlock *ab, int time_to_reach, int time_through) : id(id) {
     airblocks.push_back(ab),
         time_toreach_airblock[ab->getIndex()] = time_to_reach,
@@ -130,13 +131,13 @@ public:
   std::vector<AirBlock *> getAirBlocks();
   static std::vector<Flow *> getFlowsThroughAirBlock(std::vector<Flow *> flows,
                                                      AirBlock *ab);
-  int getTimeToReachAirBlock(int ab_index);
-  int getTimeThroughAirBlock(int ab_index);
+  int getTimeToReachAirBlock(int ab_id);
+  int getTimeThroughAirBlock(int ab_id);
   int getScheduledDepartures(int time);
-  int tao_f_a(int t,
-              int ab_index); // the earliest entry time in airspace block 'a'
-                             // of aircraft in flow 'f' that are still in
-                             // airspace block 'a' at time 't'.
+  int tau_f_a(int t,
+              int ab_id); // the earliest entry time in airspace block 'a'
+                          // of aircraft in flow 'f' that are still in
+                          // airspace block 'a' at time 't'.
   void setScheduledDepartures(std::vector<int> departures);
 };
 
@@ -185,9 +186,9 @@ public:
   std::vector<AirBlock> airblocks;
   std::vector<Flow> flows;
 
-  int PERIOD_LENGTH =
-      60; // lunghezza della discretizzazione temporale in minuti (parametro)
-  double epsilon; // tolleranza per la condizione di arresto
+  int PERIOD_LENGTH = 60; // lunghezza della discretizzazione temporale in
+                          // minuti (parametro)
+  double epsilon;         // tolleranza per la condizione di arresto
 
   int getNConfigurations();
   std::vector<int> getSimilarConfigurationsIndex(

@@ -47,10 +47,9 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
     for (Flow &flow : data.flows) {
       GRBLinExpr sum_left = 0;
       GRBLinExpr sum_right = 0;
-      for (int tao = 0; tao <= t; tao++) {
-
-        sum_left += p.at(tao, flow.getId());
-        sum_right += flow.getScheduledDepartures(tao);
+      for (int tau = 0; tau <= t; tau++) {
+        sum_left += p.at(tau, flow.getId());
+        sum_right += flow.getScheduledDepartures(tau);
       }
       slave_model.addConstr(sum_left <= sum_right); // vincolo 6.43
     }
@@ -67,9 +66,9 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
       for (int f = 0; f < flowsid.size(); f++) {
         int flowid = flowsid.at(f); //
         Flow &flow = data.flows.at(flowid);
-        for (int tao = flow.tao_f_a(t, ab_id);
-             tao <= t - flow.getTimeToReachAirBlock(ab_id); tao++) {
-          sum += p.at(tao, flowid);
+        for (int tau = flow.tau_f_a(t, ab_id);
+             tau <= t - flow.getTimeToReachAirBlock(ab_id); tau++) {
+          sum += p.at(tau, flowid);
         }
       }
       slave_model.addConstr(q.at(t, ab_id) == sum); // vincolo 6.44
@@ -81,9 +80,9 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
   for (int t = 0; t < T; t++) {
     for (Sector &sector : data.sectors) {
       GRBLinExpr sum = 0;
-      for (int tao = t; tao <= t + (60 / data.PERIOD_LENGTH) - 1; tao++) {
+      for (int tau = t; tau <= t + (60 / data.PERIOD_LENGTH) - 1; tau++) {
         for (AirBlock *ab : sector.airblocks) {
-          sum += q.at(tao, ab->getIndex());
+          sum += q.at(tau, ab->getIndex());
         }
       }
       slave_model.addConstr(Q.at(t, sector.getIndex()) == sum); // vincolo 6.45
