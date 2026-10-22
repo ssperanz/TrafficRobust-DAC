@@ -17,41 +17,143 @@ double DACCSVGenerator::hourlyFactor(int t) {
   return 0.7 + 0.4 * std::sin(3.14159265 * t / 15.0);
 };
 
-std::vector<int> DACCSVGenerator::generateTrajectory(int ROWS, int COLS,
-                                                     int TRAJ_LEN_MIN,
-                                                     int TRAJ_LEN_MAX,
-                                                     std::mt19937 &rng) {
+std::vector<std::vector<int>>
+DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
-  std::uniform_int_distribution<int> lengthDist(TRAJ_LEN_MIN, TRAJ_LEN_MAX);
+  // std::uniform_int_distribution<int> lengthDist(TRAJ_LEN_MIN, TRAJ_LEN_MAX);
   std::uniform_real_distribution<double> noise(-0.5, 0.5);
+  std::uniform_int_distribution<int> airportDist(0, ROWS * COLS - 1);
 
-  int start = startDist(rng);
-  int length = lengthDist(rng);
-
-  std::vector<int> trajectory;
-  trajectory.push_back(start);
-
-  for (int i = 1; i < length; i++) {
-    int last = trajectory.back();
-    int row = last / COLS;
-    int col = last % COLS;
-
-    double dr =
-        std::clamp(static_cast<double>(row - (start / COLS)), -1.0, 1.0) +
-        noise(rng);
-    double dc =
-        std::clamp(static_cast<double>(col - (start % COLS)), -1.0, 1.0) +
-        noise(rng);
-
-    int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
-    int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
-
-    int newBlock = newRow * COLS + newCol;
-    if (newBlock != trajectory.back())
-      trajectory.push_back(newBlock);
+  int nAirports = ROWS * COLS / 10;
+  int AirportPositions[nAirports]; // airblock id of airports
+  for (int i = 0; i < nAirports; i++) {
+    AirportPositions[i] = airportDist(rng);
   }
 
-  return trajectory;
+  /* Trajectories for: Airport A to Airbort B; Airport to grid border
+   * and viceversa;  From border to border */
+  int percBorderToBorder = 10;
+  int percAirportToAirport = 60;
+  int percAirportToBorder = 100 - percBorderToBorder - percAirportToAirport;
+  int nFlights = 1000;
+  int nFlows = nFlights / 20; // estimate, shoud be adjusted
+
+  std::vector<std::vector<int>> allTrajectories;
+  std::uniform_int_distribution<int> airportChoiceDist(0, nAirports - 1);
+
+  /* 1. Trajectories from airport A to airport B */
+  for (int i = 0; i < nFlows * percAirportToAirport / 100; i++) {
+    int start = AirportPositions[airportChoiceDist(rng)];
+    int end = AirportPositions[airportChoiceDist(rng)];
+    while (end == start) {
+      end = AirportPositions[airportChoiceDist(rng)];
+    }
+
+    std::vector<int> trajectory;
+    trajectory.push_back(start);
+
+    while (trajectory.back() != end) {
+      int last = trajectory.back();
+      int row = last / COLS;
+      int col = last % COLS;
+
+      double dr =
+          std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
+          noise(rng);
+      double dc =
+          std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
+          noise(rng);
+
+      int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
+      int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
+
+      int newBlock = newRow * COLS + newCol;
+      if (newBlock != trajectory.back())
+        trajectory.push_back(newBlock);
+    }
+
+    allTrajectories.push_back(trajectory);
+  }
+
+  /* 2. Trajectories from airport to border and viceversa */
+  for (int i = 0; i < nFlows * percAirportToBorder / 100; i++) {
+    int start = AirportPositions[rng() % nAirports];
+    int end;
+    if (rng() % 2 == 0) {
+      // Airport to border
+      int borderRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
+      int borderCol = rng() % COLS;
+      end = borderRow * COLS + borderCol;
+    } else {
+      // Border to airport
+      int borderRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
+      int borderCol = rng() % COLS;
+      end = borderRow * COLS + borderCol;
+    }
+
+    std::vector<int> trajectory;
+    trajectory.push_back(start);
+
+    while (trajectory.back() != end) {
+      int last = trajectory.back();
+      int row = last / COLS;
+      int col = last % COLS;
+
+      double dr =
+          std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
+          noise(rng);
+      double dc =
+          std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
+          noise(rng);
+
+      int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
+      int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
+
+      int newBlock = newRow * COLS + newCol;
+      if (newBlock != trajectory.back())
+        trajectory.push_back(newBlock);
+    }
+
+    allTrajectories.push_back(trajectory);
+  }
+
+  /* 3. Trajectories from border to border */
+  for (int i = 0; i < nFlows * percBorderToBorder / 100; i++) {
+    int startRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
+    int startCol = rng() % COLS;
+    int start = startRow * COLS + startCol;
+
+    int endRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
+    int endCol = rng() % COLS;
+    int end = endRow * COLS + endCol;
+
+    std::vector<int> trajectory;
+    trajectory.push_back(start);
+
+    while (trajectory.back() != end) {
+      int last = trajectory.back();
+      int row = last / COLS;
+      int col = last % COLS;
+
+      double dr =
+          std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
+          noise(rng);
+      double dc =
+          std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
+          noise(rng);
+
+      int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
+      int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
+
+      int newBlock = newRow * COLS + newCol;
+      if (newBlock != trajectory.back())
+        trajectory.push_back(newBlock);
+    }
+
+    allTrajectories.push_back(trajectory);
+  }
+
+  return allTrajectories;
 }
 
 void DACCSVGenerator::generateDACCSV(const std::string &filename,
@@ -175,7 +277,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   out << "[CONFIGURATIONS]\n";
   out << "id,sectors\n";
 
-  std::uniform_int_distribution<int> nSectorConfDist(5, 12);
+  std::uniform_int_distribution<int> nSectorConfDist(2, 15);
   std::uniform_int_distribution<int> sectorIdDist(0, NSECTORS - 1);
 
   std::vector<std::set<int>> configs;
@@ -210,11 +312,12 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   out << "[TRAJECTORIES]\n";
   out << "id,airblock,time_through\n";
 
-  for (int f = 0; f < NTRAJECTORIES; f++) {
-    std::vector<int> trajectory =
-        generateTrajectory(ROWS, COLS, TRAJ_LEN_MIN, TRAJ_LEN_MAX, rng);
-    for (int a = 0; a < trajectory.size(); a++) {
-      out << f << "," << trajectory[a] << "," << 1 << "\n";
+  std::vector<std::vector<int>> allTrajectories = generateAllTrajectories(rng);
+  for (size_t trajectory = 0; trajectory < allTrajectories.size();
+       trajectory++) {
+    for (size_t i = 0; i < allTrajectories[trajectory].size(); i++) {
+      out << trajectory << "," << allTrajectories[trajectory][i] << "," << 1
+          << "\n";
     }
   }
 
@@ -226,7 +329,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
 
   out << "[DEPARTURES]\n";
   out << "id,time,scheduled_departures\n";
-  for (int f = 0; f < NTRAJECTORIES; f++) {
+  for (int f = 0; f < allTrajectories.size(); f++) {
     for (int t = 0; t < NTIMES; t++) {
       double baseDepartures =
           ingressDist(rng) * hourlyFactor(t) * trafficVolNoise(rng);

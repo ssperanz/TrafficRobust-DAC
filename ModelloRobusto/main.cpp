@@ -15,7 +15,7 @@ using namespace std;
 int main() {
   try {
     std::cout << "Generazione dati DAC..." << std::endl;
-    DACCSVGenerator generator(20, 20, 15, 100, 100);
+    DACCSVGenerator generator(20, 20, 15, 15, 100);
     generator.generateDACCSV("path.csv", 42);
     std::cout << "Dati DAC generati e salvati in path.csv" << std::endl;
 
