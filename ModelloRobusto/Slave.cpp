@@ -66,7 +66,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
       for (int f = 0; f < flowsid.size(); f++) {
         int flowid = flowsid.at(f); //
         Flow &flow = data.flows.at(flowid);
-        for (int tau = flow.tau_f_a(t, ab_id);
+        for (int tau =
+                 data.aux.tau_f_a[t][flowid][flow.findAbPositionInFlow(ab_id)];
              tau <= t - flow.getTimeToReachAirBlock(ab_id); tau++) {
           sum += p.at(tau, flowid);
         }

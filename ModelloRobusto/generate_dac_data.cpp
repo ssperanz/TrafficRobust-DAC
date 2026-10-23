@@ -142,6 +142,15 @@ void Flow::setScheduledDepartures(std::vector<int> departures) {
   num_of_scheduled_departures = departures;
 }
 
+int Flow::findAbPositionInFlow(int ab_id) {
+  for (int i = 0; i < airblocks.size(); ++i) {
+    if (airblocks[i]->getIndex() == ab_id) {
+      return i;
+    }
+  }
+  throw std::out_of_range("AirBlock ID not found in flow");
+}
+
 // GRID
 
 int Grid::getNRows() const { return m_rows; }
@@ -281,13 +290,49 @@ std::vector<int> DACData::getSimilarConfigurationsIndex(Configuration &c1) {
   return similarIndex;
 }
 
+void DACData::calculateAuxData() {
+  int T = grid.getNTimeslots();
+  int F = flows.size();
+  int maxAbinFlow =
+      3 *
+      sqrt(
+          grid.getNCols() *
+          grid.getNRows()); // stima del numero massimo di airblock in un flusso
+
+  aux.tau_f_a.resize(
+      T, std::vector<std::vector<int>>(F, std::vector<int>(maxAbinFlow, 0)));
+  aux.BigM.resize(T, 0);
+
+  for (int t = 0; t < T; t++) {
+    for (int f = 0; f < F; f++) {
+      Flow &flow = flows[f];
+      std::vector<AirBlock *> airblocksInFlow = flow.getAirBlocks();
+      for (int abIdxPosition = 0; abIdxPosition < airblocksInFlow.size();
+           abIdxPosition++) {
+        AirBlock *ab = airblocksInFlow[abIdxPosition];
+        aux.tau_f_a[t][f][abIdxPosition] = flow.tau_f_a(t, ab->getIndex());
+      }
+      if (t == 0) {
+        for (int tau = 0; tau <= t + parameters.h - 1; tau++) {
+          aux.BigM[t] += flow.getScheduledDepartures(tau);
+        }
+      } else if (t + parameters.h < T) {
+        aux.BigM[t] =
+            aux.BigM[t - 1] + flow.getScheduledDepartures(t + parameters.h);
+      } else {
+        aux.BigM[t] = aux.BigM[t - 1];
+      }
+    }
+  }
+}
+
 DACData::DACData(const std::string &filename)
     : parameters(readParameters(filename)), grid(readGrid(filename)) {
   std::cout << "finito lettura griglia" << std::endl;
   readRest(filename);
   std::cout << "finito lettura file csv" << std::endl;
-  // calculate_tau_f_a();
-  std::cout << "finito calcolo indici tau_f_a" << std::endl;
+  calculateAuxData();
+  std::cout << "finito calcolo dati ausiliari" << std::endl;
 }
 std::string DACData::trim(std::string s) {
   while (!s.empty() && isspace(s.front()))
@@ -443,11 +488,11 @@ void DACData::readRest(const std::string &filename) {
         flows.back().airblocks.push_back(ab);
         flows.back().time_toreach_airblock.insert(
             {ab->getIndex(),
-             timeThrough +
-                 flows.back().time_toreach_airblock.at(
-                     prevAbId)}); // time to reach the new airblock is the sum
-                                  // of the time to reach the previous airblock
-                                  // and the time through the new airblock
+             timeThrough + flows.back().time_toreach_airblock.at(
+                               prevAbId)}); // time to reach the new airblock
+                                            // is the sum of the time to reach
+                                            // the previous airblock and the
+                                            // time through the new airblock
         flows.back().time_through_airblock.insert(
             {ab->getIndex(), timeThrough});
       }
