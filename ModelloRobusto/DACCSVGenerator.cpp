@@ -1,9 +1,10 @@
 #include "DACCSVGenerator.h"
 
 DACCSVGenerator::DACCSVGenerator(int rows, int cols, int ntimes, int nsectors,
-                                 int nconfigs)
+                                 int nconfigs, int h, int t_p, double epsilon)
     : ROWS(rows), COLS(cols), NTIMES(ntimes), NSECTORS(nsectors),
-      NCONFIGS(nconfigs) {}
+      NCONFIGS(nconfigs), NTIMESINONEHOUR(h), MINCONFKEEPTIME(t_p),
+      EPSILON(epsilon) {}
 
 double DACCSVGenerator::hourlyFactor(int t) {
   // Picchi di traffico
@@ -166,9 +167,6 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
 
-  int NTRAJECTORIES = 90;
-  int TRAJ_LEN_MIN = 12;
-  int TRAJ_LEN_MAX = 28;
   std::normal_distribution<double> ingressDist(0.6, 0.9);
   std::normal_distribution<double> trafficVolNoise(0.8, 1.10);
 
@@ -188,6 +186,14 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   }
 
   out << "\n";
+
+  //-----------------------------
+  // PARAMETERS
+  //-----------------------------
+  out << "[PARAMETERS]\n";
+  out << "h,t_p,epsilon\n";
+  out << NTIMESINONEHOUR << "," << MINCONFKEEPTIME << "," << EPSILON
+      << "\n\n"; // h, t_p, epsilon
 
   //-----------------------------
   // GRID

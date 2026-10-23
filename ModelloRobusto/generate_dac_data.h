@@ -10,6 +10,15 @@
 #include <unordered_map>
 #include <vector>
 
+class Parameters {
+public:
+  int h;          // number of timeslots in one hour
+  int t_p;        // minimum number of timeslots for a configuration to be kept
+  double epsilon; // tolerance for convergence
+  Parameters(int h, int t_p, double epsilon)
+      : h(h), t_p(t_p), epsilon(epsilon) {}
+};
+
 class TimeSlot {
 public:
   int id;          // indice (0,1,2,...)
@@ -143,7 +152,7 @@ public:
 
 class Grid {
 public:
-  Grid(int rows, int cols, const TimeHorizon &time, int h);
+  Grid(int rows, int cols, const TimeHorizon &time);
   // Grid(const std::string& filename);
 
   int getNRows() const;
@@ -156,7 +165,6 @@ public:
   AirBlock &airBlock(int id);
 
   int getNTimeslots();
-  int get_t_p();
 
   const std::array<double, 3> w = {
       0.10, 0.50, 0.20}; // peso di riduzione della capacit`a per un airblock
@@ -173,28 +181,32 @@ private:
   std::vector<AirBlock> m_airBlocks;
   TimeHorizon m_time;
 
+  /* Moved to parameters
   int t_p; // minimo slot temporale che deve passare tra due configurazioni
-           // diverse
+           // diverse */
 };
 
 class DACData {
 public:
   DACData(const std::string &filename);
+  Parameters parameters;
   Grid grid;
   std::vector<Sector> sectors;
   std::vector<Configuration> configurations;
   std::vector<AirBlock> airblocks;
   std::vector<Flow> flows;
 
-  int PERIOD_LENGTH = 60; // lunghezza della discretizzazione temporale in
-                          // minuti (parametro)
-  double epsilon;         // tolleranza per la condizione di arresto
+  /* Moved to Parameters */
+  // int PERIOD_LENGTH = 60; // lunghezza della discretizzazione temporale in
+  //                         // minuti (parametro)
+  // double epsilon;         // tolleranza per la condizione di arresto
 
   int getNConfigurations();
   std::vector<int> getSimilarConfigurationsIndex(
       Configuration &c); // restituisce anche l'indice di c
   void readRest(const std::string &filename);
   Grid readGrid(const std::string &filename);
+  Parameters readParameters(const std::string &filename);
 
 private:
   static std::vector<std::string> split(const std::string &s, char sep);

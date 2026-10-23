@@ -156,15 +156,50 @@ AirBlock &Grid::airBlock(int row, int col) {
 
 int Grid::getNTimeslots() { return m_time.size(); }
 
-int Grid::get_t_p() { return t_p; }
-
-Grid::Grid(int rows, int cols, const TimeHorizon &time, int t_p)
-    : m_rows(rows), m_cols(cols), m_time(time), t_p(t_p) {
+Grid::Grid(int rows, int cols, const TimeHorizon &time)
+    : m_rows(rows), m_cols(cols), m_time(time) {
   int id = 0;
 
   for (int r = 0; r < rows; ++r)
     for (int c = 0; c < cols; ++c)
       m_airBlocks.emplace_back(id++, r, c, time.size());
+}
+
+Parameters DACData::readParameters(const std::string &filename) {
+  std::ifstream in(filename);
+
+  if (!in)
+    throw std::runtime_error("Cannot open file.");
+
+  std::string line;
+  std::string section;
+
+  int h = 0;
+  int t_p = 0;
+  double epsilon = 0.0;
+
+  while (std::getline(in, line)) {
+    line = trim(line);
+
+    if (line.empty())
+      continue;
+
+    if (line[0] == '[') {
+      section = line;
+      std::getline(in, line); // salta intestazione
+      continue;
+    }
+
+    else if (section == "[PARAMETERS]") {
+      auto f = split(line, ',');
+
+      h = stoi(f[0]);
+      t_p = stoi(f[1]);
+      epsilon = stod(f[2]);
+    }
+  }
+
+  return Parameters(h, t_p, epsilon);
 }
 
 Grid DACData::readGrid(const std::string &filename) {
@@ -229,7 +264,7 @@ Grid DACData::readGrid(const std::string &filename) {
     }
   }
 
-  return Grid(rows, cols, time, h);
+  return Grid(rows, cols, time);
 }
 
 int DACData::getNConfigurations() { return configurations.size(); }
@@ -247,7 +282,7 @@ std::vector<int> DACData::getSimilarConfigurationsIndex(Configuration &c1) {
 }
 
 DACData::DACData(const std::string &filename)
-    : grid(readGrid(filename)), epsilon(1e-4) {
+    : parameters(readParameters(filename)), grid(readGrid(filename)) {
   std::cout << "finito lettura griglia" << std::endl;
   readRest(filename);
   std::cout << "finito lettura file csv" << std::endl;

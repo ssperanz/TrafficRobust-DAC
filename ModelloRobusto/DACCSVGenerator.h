@@ -12,7 +12,9 @@
 class DACCSVGenerator {
 public:
   DACCSVGenerator(int ROWS = 20, int COLS = 20, int NTIMES = 15,
-                  int NSECTORS = 100, int NCONFIGS = 20);
+                  int NSECTORS = 100, int NCONFIGS = 20,
+                  int NTIMESINONEHOUR = 1, int MINCONFKEEPTIME = 5,
+                  double EPSILON = 1e-4);
   void generateDACCSV(const std::string &filename, unsigned int seed);
   double hourlyFactor(int t);
   std::vector<std::vector<int>> generateAllTrajectories(std::mt19937 &rng);
@@ -23,5 +25,7 @@ private:
   int NTIMES;
   int NSECTORS;
   int NCONFIGS;
-  std::vector<int> generateTrajectoy(std::vector<int> &trajectory);
+  int MINCONFKEEPTIME;
+  int NTIMESINONEHOUR;
+  double EPSILON;
 };

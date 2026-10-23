@@ -48,7 +48,7 @@ int main() {
       cout << "Risoluzione slave" << endl;
       SlaveSolution slaveSol = slave.solve();
       double max_excess = slaveSol.excess;
-      if (max_excess - sol.theta <= data.epsilon) {
+      if (max_excess - sol.theta <= data.parameters.epsilon) {
         cout << "Aggiustamento completato! Soluzione ottima trovata." << endl;
         converged = true;
         // Stampa risultati

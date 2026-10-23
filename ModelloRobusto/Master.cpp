@@ -13,7 +13,7 @@ MasterSolution Master::solve() {
 Master::Master(DACData &data, GRBEnv &env)
     : T(data.grid.getNTimeslots()), C(data.getNConfigurations()), x(T, C),
       s(T, C), env(env), master_model(env), data(data), iter(0) {
-  int t_p = data.grid.get_t_p();
+  int t_p = data.parameters.t_p;
   // std::cout << "Numero di timeslots: " << T << std::endl;
   // std::cout << "Costruzione modello master..." << std::endl;
   //  TODO?? 6.34 con valori nominali
