@@ -60,9 +60,13 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   for (int i = 0; i < nFlows * percAirportToAirport / 100; i++) {
     int start = AirportPositions[airportChoiceDist(rng)];
     int end = AirportPositions[airportChoiceDist(rng)];
+
+    int attempts = 0;
     while (end == start ||
-           calculateAirblockDistance(COLS, start, end) < minAirportDistance) {
+           calculateAirblockDistance(COLS, start, end) < minAirportDistance ||
+           attempts > 20) {
       end = AirportPositions[airportChoiceDist(rng)];
+      attempts++;
     }
 
     std::vector<int> trajectory;
