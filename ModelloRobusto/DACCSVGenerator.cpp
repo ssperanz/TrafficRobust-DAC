@@ -1,11 +1,13 @@
 #include "DACCSVGenerator.h"
 
-DACCSVGenerator::DACCSVGenerator(int rows, int cols, int ntimes, int nsectors,
-                                 int nconfigs, int h, int t_p, double epsilon)
-    : ROWS(rows), COLS(cols), NTIMES(ntimes), NSECTORS(nsectors),
-      NCONFIGS(nconfigs), NTIMESINONEHOUR(h), MINCONFKEEPTIME(t_p),
-      EPSILON(epsilon) {}
+DACCSVGenerator::DACCSVGenerator(int rows, int cols, int nhours, int startHour,
+                                 int nsectors, int nconfigs, int h, int t_p,
+                                 double epsilon)
+    : ROWS(rows), COLS(cols), NTIMES(nhours * h), STARTHOUR(startHour),
+      NSECTORS(nsectors), NCONFIGS(nconfigs), NTIMESINONEHOUR(h),
+      MINCONFKEEPTIME(t_p), EPSILON(epsilon) {}
 
+// TODO: to fix considering also h and startHour
 double DACCSVGenerator::hourlyFactor(int t) {
   // Picchi di traffico
   if (t == 0)
@@ -186,27 +188,34 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::ofstream out(filename);
 
   //-----------------------------
-  // TIME
-  //-----------------------------
-  out << "[TIME]\n";
-  out << "id,start,end\n";
-
-  for (int t = 0; t < NTIMES; t++) {
-    int startHour = 6 + t;
-    int endHour = 7 + t;
-
-    out << t << "," << startHour << ":00," << endHour << ":00\n";
-  }
-
-  out << "\n";
-
-  //-----------------------------
   // PARAMETERS
   //-----------------------------
   out << "[PARAMETERS]\n";
   out << "h,t_p,epsilon\n";
   out << NTIMESINONEHOUR << "," << MINCONFKEEPTIME << "," << EPSILON
       << "\n\n"; // h, t_p, epsilon
+
+  //-----------------------------
+  // TIME
+  //-----------------------------
+  out << "[TIME]\n";
+  out << "id,start,end\n";
+
+  for (int t = 0; t < NTIMES; t++) {
+    int startH = STARTHOUR + t / NTIMESINONEHOUR;
+    int startM = (t % NTIMESINONEHOUR) * (60 / NTIMESINONEHOUR);
+    int endH = STARTHOUR + (t + 1) / NTIMESINONEHOUR;
+    int endM = ((t + 1) % NTIMESINONEHOUR) * (60 / NTIMESINONEHOUR);
+    std::string startM_string =
+        (startM < 10) ? "0" + std::to_string(startM) : std::to_string(startM);
+    std::string endM_string =
+        (endM < 10) ? "0" + std::to_string(endM) : std::to_string(endM);
+
+    out << t << "," << startH << ":" << startM_string << "," << endH << ":"
+        << endM_string << "\n";
+  }
+
+  out << "\n";
 
   //-----------------------------
   // GRID

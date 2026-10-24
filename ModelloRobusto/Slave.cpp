@@ -81,7 +81,8 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
   for (int t = 0; t < T; t++) {
     for (Sector &sector : data.sectors) {
       GRBLinExpr sum = 0;
-      for (int tau = t; tau <= t + data.parameters.h - 1; tau++) {
+      for (int tau = t; tau <= std::min(t + data.parameters.h - 1, T - 1);
+           tau++) {
         for (AirBlock *ab : sector.airblocks) {
           sum += q.at(tau, ab->getIndex());
         }
