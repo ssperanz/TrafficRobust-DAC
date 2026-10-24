@@ -18,6 +18,15 @@ double DACCSVGenerator::hourlyFactor(int t) {
   return 0.7 + 0.4 * std::sin(3.14159265 * t / 15.0);
 };
 
+double DACCSVGenerator::calculateAirblockDistance(int COLS, int ab1, int ab2) {
+  int row1 = ab1 / COLS;
+  int col1 = ab1 % COLS;
+  int row2 = ab2 / COLS;
+  int col2 = ab2 % COLS;
+
+  return std::sqrt((row1 - row2) ^ 2 + (col1 - col2) ^ 2);
+}
+
 std::vector<std::vector<int>>
 DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
@@ -30,6 +39,9 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   for (int i = 0; i < nAirports; i++) {
     AirportPositions[i] = airportDist(rng);
   }
+  double minAirportDistance =
+      5.0; // minimum distance in airblocks between airports
+           // for the airport to airport trajectories
 
   /* Trajectories for: Airport A to Airbort B; Airport to grid border
    * and viceversa;  From border to border */
@@ -46,7 +58,8 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   for (int i = 0; i < nFlows * percAirportToAirport / 100; i++) {
     int start = AirportPositions[airportChoiceDist(rng)];
     int end = AirportPositions[airportChoiceDist(rng)];
-    while (end == start) {
+    while (end == start ||
+           calculateAirblockDistance(COLS, start, end) < minAirportDistance) {
       end = AirportPositions[airportChoiceDist(rng)];
     }
 

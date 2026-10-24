@@ -18,6 +18,7 @@ public:
   void generateDACCSV(const std::string &filename, unsigned int seed);
   double hourlyFactor(int t);
   std::vector<std::vector<int>> generateAllTrajectories(std::mt19937 &rng);
+  double calculateAirblockDistance(int COLS, int ab1, int ab2);
 
 private:
   int ROWS;
