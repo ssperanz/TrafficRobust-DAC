@@ -225,8 +225,8 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   // GRID
   //-----------------------------
   out << "[GRID]\n";
-  out << "rows,cols,h\n";
-  out << ROWS << "," << COLS << "," << 2 << "\n\n";
+  out << "rows,cols\n";
+  out << ROWS << "," << COLS << "\n\n";
 
   //-----------------------------
   // SECTORS

@@ -227,7 +227,6 @@ Grid DACData::readGrid(const std::string &filename) {
 
   int rows = 0;
   int cols = 0;
-  int h = 0;
 
   while (std::getline(in, line)) {
     line = trim(line);
@@ -269,7 +268,6 @@ Grid DACData::readGrid(const std::string &filename) {
 
       rows = std::stoi(f[0]);
       cols = std::stoi(f[1]);
-      h = std::stoi(f[2]);
     }
   }
 
