@@ -26,6 +26,8 @@ public:
             std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
                 &sectorsCoordinates,
             std::mt19937 &rng);
+  void validateSectors(const std::vector<std::vector<int>> &sectors, int ROWS,
+                       int COLS);
 
 private:
   int ROWS;

@@ -44,6 +44,25 @@ std::vector<int> DACCSVGenerator::calculateSectorAirblocks(int x1, int y1,
   return blocks;
 }
 
+void DACCSVGenerator::validateSectors(
+    const std::vector<std::vector<int>> &sectors, int ROWS, int COLS) {
+  int airblockCount = 0;
+  for (const auto &sector : sectors) {
+    if (sector.empty()) {
+      throw std::invalid_argument("Empty sector found");
+    }
+    for (int block : sector) {
+      if (block < 0 || block >= ROWS * COLS) {
+        throw std::invalid_argument("Invalid airblock ID found in sector");
+      }
+    }
+    airblockCount += sector.size();
+  }
+  if (airblockCount != ROWS * COLS) {
+    throw std::invalid_argument("Not all airblocks are covered by sectors");
+  }
+}
+
 void DACCSVGenerator::partition(
     int x1, int y1, int x2, int y2, int minSectorLength, int maxSectors,
     std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
@@ -304,6 +323,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
           calculateSectorAirblocks(x1, y1, x2, y2, ROWS, COLS);
       sectors.push_back(blocks);
     }
+    validateSectors(sectors, ROWS, COLS);
     std::vector<int> sectorIds;
     for (size_t i = 0; i < sectors.size(); i++) {
       sectorIds.push_back(sectorId);
