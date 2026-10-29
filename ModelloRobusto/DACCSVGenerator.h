@@ -17,6 +17,12 @@ public:
                   double EPSILON = 1e-4);
   void generateDACCSV(const std::string &filename, unsigned int seed);
   double hourlyFactor(int t);
+  void generateSingleTrajectory(std::vector<int> &trajectory, int start,
+                                int end, int ROWS, int COLS,
+                                std::vector<std::vector<int>> &allTrajectories,
+                                std::mt19937 &rng,
+                                std::uniform_real_distribution<double> &noise);
+
   std::vector<std::vector<int>> generateAllTrajectories(std::mt19937 &rng);
   double calculateAirblockDistance(int COLS, int ab1, int ab2);
   std::vector<int> calculateSectorAirblocks(int x1, int y1, int x2, int y2,

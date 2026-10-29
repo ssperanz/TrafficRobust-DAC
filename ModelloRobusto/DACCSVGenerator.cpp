@@ -96,6 +96,30 @@ void DACCSVGenerator::partition(
   }
 }
 
+void DACCSVGenerator::generateSingleTrajectory(
+    std::vector<int> &trajectory, int start, int end, int ROWS, int COLS,
+    std::vector<std::vector<int>> &allTrajectories, std::mt19937 &rng,
+    std::uniform_real_distribution<double> &noise) {
+  trajectory.push_back(start);
+  while (trajectory.back() != end) {
+    int last = trajectory.back();
+    int row = last / COLS;
+    int col = last % COLS;
+
+    double dr = std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
+                noise(rng);
+    double dc = std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
+                noise(rng);
+
+    int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
+    int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
+
+    int newBlock = newRow * COLS + newCol;
+    if (newBlock != trajectory.back())
+      trajectory.push_back(newBlock);
+  }
+}
+
 std::vector<std::vector<int>>
 DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
@@ -137,28 +161,8 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
     }
 
     std::vector<int> trajectory;
-    trajectory.push_back(start);
-
-    while (trajectory.back() != end) {
-      int last = trajectory.back();
-      int row = last / COLS;
-      int col = last % COLS;
-
-      double dr =
-          std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
-          noise(rng);
-      double dc =
-          std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
-          noise(rng);
-
-      int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
-      int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
-
-      int newBlock = newRow * COLS + newCol;
-      if (newBlock != trajectory.back())
-        trajectory.push_back(newBlock);
-    }
-
+    generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
+                             allTrajectories, rng, noise);
     allTrajectories.push_back(trajectory);
   }
 
@@ -179,28 +183,8 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
     }
 
     std::vector<int> trajectory;
-    trajectory.push_back(start);
-
-    while (trajectory.back() != end) {
-      int last = trajectory.back();
-      int row = last / COLS;
-      int col = last % COLS;
-
-      double dr =
-          std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
-          noise(rng);
-      double dc =
-          std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
-          noise(rng);
-
-      int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
-      int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
-
-      int newBlock = newRow * COLS + newCol;
-      if (newBlock != trajectory.back())
-        trajectory.push_back(newBlock);
-    }
-
+    generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
+                             allTrajectories, rng, noise);
     allTrajectories.push_back(trajectory);
   }
 
@@ -215,28 +199,8 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
     int end = endRow * COLS + endCol;
 
     std::vector<int> trajectory;
-    trajectory.push_back(start);
-
-    while (trajectory.back() != end) {
-      int last = trajectory.back();
-      int row = last / COLS;
-      int col = last % COLS;
-
-      double dr =
-          std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
-          noise(rng);
-      double dc =
-          std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
-          noise(rng);
-
-      int newRow = std::clamp(static_cast<int>(row + dr), 0, ROWS - 1);
-      int newCol = std::clamp(static_cast<int>(col + dc), 0, COLS - 1);
-
-      int newBlock = newRow * COLS + newCol;
-      if (newBlock != trajectory.back())
-        trajectory.push_back(newBlock);
-    }
-
+    generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
+                             allTrajectories, rng, noise);
     allTrajectories.push_back(trajectory);
   }
 
