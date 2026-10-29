@@ -93,13 +93,12 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
 
   // std::cout << "Aggiunti vincoli 6.45" << std::endl;
 
-  int M2 = 1000000; // TODO: può essere ottimizzato
-
   for (int t = 0; t < T; t++) {
     for (Sector &sector : data.sectors) {
       int s = sector.getIndex();
       int capacity_s_t = sector.getCapacity(t);
-      slave_model.addConstr(e.at(t, s) <= M2 * w.at(t, s)); // vincolo 6.46
+      slave_model.addConstr(e.at(t, s) <=
+                            data.aux.BigM[t] * w.at(t, s)); // vincolo 6.46
       slave_model.addConstr(
           e.at(t, s) <=
           Q.at(t, s) - capacity_s_t +
