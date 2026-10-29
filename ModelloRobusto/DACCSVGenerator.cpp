@@ -1,11 +1,11 @@
 #include "DACCSVGenerator.h"
 
 DACCSVGenerator::DACCSVGenerator(int rows, int cols, int nhours, int startHour,
-                                 int nsectors, int nconfigs, int h, int t_p,
-                                 double epsilon)
+                                 int min_sector_length, int nconfigs, int h,
+                                 int t_p, double epsilon)
     : ROWS(rows), COLS(cols), NTIMES(nhours * h), STARTHOUR(startHour),
-      NSECTORS(nsectors), NCONFIGS(nconfigs), NTIMESINONEHOUR(h),
-      MINCONFKEEPTIME(t_p), EPSILON(epsilon) {}
+      NSECTORS(0), MINSECTORLENGTH(min_sector_length), NCONFIGS(nconfigs),
+      NTIMESINONEHOUR(h), MINCONFKEEPTIME(t_p), EPSILON(epsilon) {}
 
 // TODO: to fix considering also h and startHour
 double DACCSVGenerator::hourlyFactor(int t) {
@@ -29,6 +29,54 @@ double DACCSVGenerator::calculateAirblockDistance(int COLS, int ab1, int ab2) {
   return std::sqrt((row1 - row2) ^ 2 + (col1 - col2) ^ 2);
 }
 
+std::vector<int> DACCSVGenerator::calculateSectorAirblocks(int x1, int y1,
+                                                           int x2, int y2,
+                                                           int ROWS, int COLS) {
+  std::vector<int> blocks;
+  for (int y = y1; y <= y2; y++) {
+    for (int x = x1; x <= x2; x++) {
+      if (x >= 0 && x < COLS && y >= 0 && y < ROWS) {
+        int blockId = y * COLS + x;
+        blocks.push_back(blockId);
+      }
+    }
+  }
+  return blocks;
+}
+
+void DACCSVGenerator::partition(
+    int x1, int y1, int x2, int y2, int minSectorLength, int maxSectors,
+    std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
+        &sectorsCoordinates,
+    std::mt19937 &rng) {
+  int width = x2 - x1 + 1;
+  int height = y2 - y1 + 1;
+
+  if (maxSectors <= 0 || width < 2 * minSectorLength ||
+      height < 2 * minSectorLength || width <= 0 || height <= 0) {
+    sectorsCoordinates.push_back(
+        std::make_pair(std::make_pair(x1, y1), std::make_pair(x2, y2)));
+    return;
+  }
+  std::uniform_int_distribution<int> distX(x1 + minSectorLength - 1,
+                                           x2 - minSectorLength + 1);
+  std::uniform_int_distribution<int> distY(y1 + minSectorLength - 1,
+                                           y2 - minSectorLength + 1);
+  if (width >= height) {
+    int newX = distX(rng);
+    partition(x1, y1, newX, y2, minSectorLength, maxSectors - 1,
+              sectorsCoordinates, rng);
+    partition(newX + 1, y1, x2, y2, minSectorLength, maxSectors - 1,
+              sectorsCoordinates, rng);
+  } else {
+    int newY = distY(rng);
+    partition(x1, y1, x2, newY, minSectorLength, maxSectors - 1,
+              sectorsCoordinates, rng);
+    partition(x1, newY + 1, x2, y2, minSectorLength, maxSectors - 1,
+              sectorsCoordinates, rng);
+  }
+}
+
 std::vector<std::vector<int>>
 DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
@@ -50,7 +98,7 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   int percBorderToBorder = 10;
   int percAirportToAirport = 60;
   int percAirportToBorder = 100 - percBorderToBorder - percAirportToAirport;
-  int nFlights = 1000;
+  int nFlights = 300;
   int nFlows = nFlights / 20; // estimate, shoud be adjusted
 
   std::vector<std::vector<int>> allTrajectories;
@@ -231,36 +279,52 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   //-----------------------------
   // SECTORS
   //-----------------------------
+
+  std::vector<std::vector<int>> configs;
+  int sectorId = 0;
+
   out << "[SECTORS]\n";
   out << "id,airblocks\n";
+  for (int c = 0; c < NCONFIGS; c++) {
+    int maxSector = sectorSizeDist(rng);
 
-  std::vector<std::vector<int>> sectorBlocks;
+    std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
+        sectorsCoordinates;
+    partition(0, 0, COLS - 1, ROWS - 1, MINSECTORLENGTH, maxSector,
+              sectorsCoordinates, rng);
+    NSECTORS += sectorsCoordinates.size();
+    std::vector<std::vector<int>> sectors;
+    for (const auto &coord : sectorsCoordinates) {
+      int x1 = coord.first.first;
+      int y1 = coord.first.second;
+      int x2 = coord.second.first;
+      int y2 = coord.second.second;
 
-  for (int s = 0; s < NSECTORS; s++) {
-    int size = sectorSizeDist(rng);
-
-    std::set<int> blocks;
-
-    while (blocks.size() < size)
-      blocks.insert(blockDist(rng));
-
-    sectorBlocks.emplace_back(blocks.begin(), blocks.end());
-
-    out << s << ",\"";
-
-    for (size_t i = 0; i < sectorBlocks.back().size(); i++) {
-      out << sectorBlocks.back()[i];
-
-      if (i + 1 < sectorBlocks.back().size())
-        out << ";";
+      std::vector<int> blocks =
+          calculateSectorAirblocks(x1, y1, x2, y2, ROWS, COLS);
+      sectors.push_back(blocks);
     }
-
-    out << "\"\n";
+    std::vector<int> sectorIds;
+    for (size_t i = 0; i < sectors.size(); i++) {
+      sectorIds.push_back(sectorId);
+      out << sectorId++ << ",\"";
+      for (size_t j = 0; j < sectors[i].size(); j++) {
+        out << sectors[i][j];
+        if (j + 1 < sectors[i].size())
+          out << ";";
+      }
+      out << "\"\n";
+    }
+    configs.push_back(sectorIds);
   }
 
   out << "\n";
 
   out << "\n";
+
+  //-----------------------------
+  // CAPACITY
+  //-----------------------------
 
   out << "[CAPACITY]\n";
   out << "sector,time,capacity\n";
@@ -312,27 +376,13 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::uniform_int_distribution<int> nSectorConfDist(2, 15);
   std::uniform_int_distribution<int> sectorIdDist(0, NSECTORS - 1);
 
-  std::vector<std::set<int>> configs;
-
   for (int c = 0; c < NCONFIGS; c++) {
-    int n = nSectorConfDist(rng);
-
-    std::set<int> conf;
-
-    while (conf.size() < n)
-      conf.insert(sectorIdDist(rng));
-
-    configs.push_back(conf);
-
     out << c << ",\"";
-
-    size_t k = 0;
-    for (int s : conf) {
-      out << s;
-      if (++k < conf.size())
+    for (size_t i = 0; i < configs[c].size(); i++) {
+      out << configs[c][i];
+      if (i + 1 < configs[c].size())
         out << ";";
     }
-
     out << "\"\n";
   }
 
@@ -363,8 +413,9 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   out << "id,time,scheduled_departures\n";
   for (int f = 0; f < allTrajectories.size(); f++) {
     for (int t = 0; t < NTIMES; t++) {
-      double baseDepartures =
-          ingressDist(rng) * hourlyFactor(t) * trafficVolNoise(rng);
+      double baseDepartures = ingressDist(rng) *
+                              hourlyFactor(t / NTIMESINONEHOUR) *
+                              trafficVolNoise(rng) / NTIMESINONEHOUR;
       int departures = std::max(0, static_cast<int>(baseDepartures));
       out << f << "," << t << "," << departures << "\n";
     }
