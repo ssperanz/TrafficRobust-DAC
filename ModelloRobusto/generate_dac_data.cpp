@@ -34,6 +34,10 @@ double AirBlock::getTraffic(int t) { return traffic[t]; }
 std::vector<int> AirBlock::getFlows() { return flows; }
 int AirBlock::getFlow(int f) { return flows.at(f); }
 void AirBlock::addFlow(int flowId) { flows.push_back(flowId); }
+bool AirBlock::markAsAirport(bool airport) {
+  hasAirport = airport;
+  return hasAirport;
+}
 
 // SECTOR
 
@@ -507,6 +511,14 @@ void DACData::readRest(const std::string &filename) {
         }
       }
 
+    }
+
+    else if (section == "[AIRPORTS]") {
+      auto f = split(line, ',');
+
+      int abId = stoi(f[1]);
+      AirBlock *ab = &airblocks.at(abId);
+      ab->markAsAirport();
     }
 
     else if (section == "[DEPARTURES]") {

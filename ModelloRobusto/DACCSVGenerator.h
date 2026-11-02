@@ -23,7 +23,9 @@ public:
                                 std::mt19937 &rng,
                                 std::uniform_real_distribution<double> &noise);
 
-  std::vector<std::vector<int>> generateAllTrajectories(std::mt19937 &rng);
+  std::vector<std::vector<int>>
+  generateAllTrajectories(std::mt19937 &rng,
+                          std::vector<int> &airportPositions);
   double calculateAirblockDistance(int COLS, int ab1, int ab2);
   std::vector<int> calculateSectorAirblocks(int x1, int y1, int x2, int y2,
                                             int ROWS, int COLS);

@@ -126,7 +126,8 @@ void DACCSVGenerator::generateSingleTrajectory(
 }
 
 std::vector<std::vector<int>>
-DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
+DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
+                                         std::vector<int> &airportPositions) {
   std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
   // std::uniform_int_distribution<int> lengthDist(TRAJ_LEN_MIN, TRAJ_LEN_MAX);
   std::uniform_real_distribution<double> noise(-0.5, 0.5);
@@ -136,6 +137,7 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng) {
   int AirportPositions[nAirports]; // airblock id of airports
   for (int i = 0; i < nAirports; i++) {
     AirportPositions[i] = airportDist(rng);
+    airportPositions.push_back(AirportPositions[i]);
   }
   double minAirportDistance =
       5.0; // minimum distance in airblocks between airports
@@ -383,13 +385,27 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   out << "[TRAJECTORIES]\n";
   out << "id,airblock,time_through\n";
 
-  std::vector<std::vector<int>> allTrajectories = generateAllTrajectories(rng);
+  std::vector<int> airportPositions;
+  std::vector<std::vector<int>> allTrajectories =
+      generateAllTrajectories(rng, airportPositions);
   for (size_t trajectory = 0; trajectory < allTrajectories.size();
        trajectory++) {
     for (size_t i = 0; i < allTrajectories[trajectory].size(); i++) {
       out << trajectory << "," << allTrajectories[trajectory][i] << "," << 1
           << "\n";
     }
+  }
+
+  out << "\n";
+
+  //-----------------------------
+  // AIRPORTS //
+  //-----------------------------
+
+  out << "[AIRPORTS]\n";
+  out << "id,airblock\n";
+  for (size_t i = 0; i < airportPositions.size(); i++) {
+    out << i << "," << airportPositions[i] << "\n";
   }
 
   out << "\n";

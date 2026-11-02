@@ -56,7 +56,7 @@ void Viewer::show() {
     }
   }
 
-  /** Print the grid, showing sectorid in each cell, for each configuration */
+  /** Prints the grid, showing sectorid in each cell, for each configuration */
   for (int c = 0; c < configs; ++c) {
     std::cout << "Configuration " << c << ":\n";
     for (int r = 0; r < rows; ++r) {
@@ -70,7 +70,8 @@ void Viewer::show() {
           // sectorId formatted to 3 digits for alignment
           auto color = palette[sectorId % palette.size()];
           std::cout << "\033[48;2;" << color[0] << ";" << color[1] << ";"
-                    << color[2] << "m" << std::setw(3) << abIndex << " "
+                    << color[2] << "m" << std::setw(4) << abIndex
+                    << (data.airblocks[abIndex].hasAirport ? "A" : " ")
                     << "\033[0m";
         }
       }

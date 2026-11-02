@@ -52,7 +52,8 @@ public:
   int index;
   int row;
   int col;
-  std::vector<int> flows; // flussi che attraversano l’airblock
+  std::vector<int> flows;  // flussi che attraversano l’airblock
+  bool hasAirport = false; // indicates if the airblock contains an airport
 
   std::vector<double> traffic;
   std::vector<int> pLevel;
@@ -74,6 +75,7 @@ public:
   std::vector<int> getFlows();
   int getFlow(int f);
   void addFlow(int flowId);
+  bool markAsAirport(bool airport = true);
 };
 
 class Sector {
