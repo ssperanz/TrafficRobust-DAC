@@ -7,6 +7,7 @@
 // #include "TestData.h"
 #include "Master.h"
 #include "Slave.h"
+#include "Viewer.h"
 #include <iostream>
 #include <vector>
 
@@ -38,6 +39,8 @@ int main() {
              << " traffic t0=" << s->getTraffic(0) << endl;
       }
     }
+    Viewer viewer(data);
+    viewer.show();
     Master master(data, env);
     MasterSolution sol = master.solve();
     Slave slave(sol, env, data);

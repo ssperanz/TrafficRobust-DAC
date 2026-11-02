@@ -71,28 +71,33 @@ void DACCSVGenerator::partition(
   int width = x2 - x1 + 1;
   int height = y2 - y1 + 1;
 
-  if (maxSectors <= 0 || width < 2 * minSectorLength ||
-      height < 2 * minSectorLength || width <= 0 || height <= 0) {
+  if (x1 > x2 || y1 > y2)
+    return; // Invalid coordinates
+  if (width <= 0 || height <= 0)
+    return; // Invalid dimensions
+  if (maxSectors <= 1 ||
+      (width <= 2 * minSectorLength && height <= 2 * minSectorLength)) {
     sectorsCoordinates.push_back(
         std::make_pair(std::make_pair(x1, y1), std::make_pair(x2, y2)));
-    return;
+    return; // Cannot partition further
   }
-  std::uniform_int_distribution<int> distX(x1 + minSectorLength - 1,
-                                           x2 - minSectorLength + 1);
-  std::uniform_int_distribution<int> distY(y1 + minSectorLength - 1,
-                                           y2 - minSectorLength + 1);
+
   if (width >= height) {
+    std::uniform_int_distribution<int> distX(x1 + minSectorLength - 1,
+                                             x2 - minSectorLength);
     int newX = distX(rng);
-    partition(x1, y1, newX, y2, minSectorLength, maxSectors - 1,
+    partition(x1, y1, newX, y2, minSectorLength, maxSectors / 2,
               sectorsCoordinates, rng);
-    partition(newX + 1, y1, x2, y2, minSectorLength, maxSectors - 1,
-              sectorsCoordinates, rng);
+    partition(newX + 1, y1, x2, y2, minSectorLength,
+              maxSectors - (maxSectors / 2), sectorsCoordinates, rng);
   } else {
+    std::uniform_int_distribution<int> distY(y1 + minSectorLength - 1,
+                                             y2 - minSectorLength);
     int newY = distY(rng);
-    partition(x1, y1, x2, newY, minSectorLength, maxSectors - 1,
+    partition(x1, y1, x2, newY, minSectorLength, maxSectors / 2,
               sectorsCoordinates, rng);
-    partition(x1, newY + 1, x2, y2, minSectorLength, maxSectors - 1,
-              sectorsCoordinates, rng);
+    partition(x1, newY + 1, x2, y2, minSectorLength,
+              maxSectors - (maxSectors / 2), sectorsCoordinates, rng);
   }
 }
 
