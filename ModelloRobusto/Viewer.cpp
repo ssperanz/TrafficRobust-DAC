@@ -69,10 +69,16 @@ void Viewer::show() {
           // Prints sectorId with background color
           // sectorId formatted to 3 digits for alignment
           auto color = palette[sectorId % palette.size()];
-          std::cout << "\033[48;2;" << color[0] << ";" << color[1] << ";"
-                    << color[2] << "m" << std::setw(4) << abIndex
-                    << (data.airblocks[abIndex].hasAirport ? "A" : " ")
-                    << "\033[0m";
+          /* Prints id in bold text for airports */
+          if (data.airblocks[abIndex].hasAirport) {
+            std::cout << "\033[1m\033[48;2;" << color[0] << ";" << color[1]
+                      << ";" << color[2] << "m" << std::setw(4) << sectorId
+                      << "\033[0m";
+          } else {
+            std::cout << "\033[48;2;" << color[0] << ";" << color[1] << ";"
+                      << color[2] << "m" << std::setw(4) << sectorId
+                      << "\033[0m";
+          }
         }
       }
       std::cout << "\n";
@@ -93,13 +99,12 @@ void Viewer::show() {
                          }) != flow.airblocks.end()) {
           auto color = palette[flow.id % palette.size()];
 
-          std::cout << "\033[48;2;" << color[0] << ";" << color[1] << ";"
-                    << color[2] << "m" << std::setw(4) << abIndex
-                    << (data.airblocks[abIndex].hasAirport ? "A" : " ")
-                    << "\033[0m";
+          std::cout << (data.airblocks[abIndex].hasAirport ? "\033[1m\033[48;2;"
+                                                           : "\033[48;2;")
+                    << color[0] << ";" << color[1] << ";" << color[2] << "m"
+                    << std::setw(4) << abIndex << "\033[0m";
         } else {
-          std::cout << std::setw(4) << abIndex
-                    << (data.airblocks[abIndex].hasAirport ? "A" : " ");
+          std::cout << std::setw(4) << abIndex << "\033[0m";
         }
       }
       std::cout << "\n";
