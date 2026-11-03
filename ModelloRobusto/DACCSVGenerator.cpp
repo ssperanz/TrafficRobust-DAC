@@ -100,17 +100,15 @@ void DACCSVGenerator::partition(
               maxSectors - (maxSectors / 2), sectorsCoordinates, rng);
   }
 }
-
-void DACCSVGenerator::generateSingleTrajectory(
+/* TODO: to fix*/
+void DACCSVGenerator::generateStraightTrajectory(
     std::vector<int> &trajectory, int start, int end, int ROWS, int COLS,
-    std::vector<std::vector<int>> &allTrajectories, std::mt19937 &rng,
-    std::uniform_real_distribution<double> &noise) {
-  trajectory.push_back(start);
+    std::mt19937 &rng, std::uniform_real_distribution<double> &noise) {
+
   while (trajectory.back() != end) {
     int last = trajectory.back();
     int row = last / COLS;
     int col = last % COLS;
-
     double dr = std::clamp(static_cast<double>((end / COLS) - row), -1.0, 1.0) +
                 noise(rng);
     double dc = std::clamp(static_cast<double>((end % COLS) - col), -1.0, 1.0) +
@@ -123,14 +121,95 @@ void DACCSVGenerator::generateSingleTrajectory(
     if (newBlock != trajectory.back())
       trajectory.push_back(newBlock);
   }
+  // Already adds the end block in the loop
+}
+
+void DACCSVGenerator::generateSingleTrajectory(
+    std::vector<int> &trajectory, int start, int end, int ROWS, int COLS,
+    std::vector<std::vector<int>> &allTrajectories, std::mt19937 &rng,
+    std::uniform_real_distribution<double> &noise, TrajectoryShape shape) {
+
+  trajectory.push_back(start);
+
+  switch (shape) {
+  case STRAIGHT:
+    generateStraightTrajectory(trajectory, start, end, ROWS, COLS, rng, noise);
+    break;
+
+  case CURVED_1: {
+
+    /* Generates a random point between start and end with some deviation to
+     * simulate a curved trajectory */
+    std::uniform_int_distribution<int> midRowDist(
+        std::min(start / COLS, end / COLS), std::max(start / COLS, end / COLS));
+    std::uniform_int_distribution<int> midColDist(
+        std::min(start % COLS, end % COLS), std::max(start % COLS, end % COLS));
+
+    int midRow = midRowDist(rng);
+    int midCol = midColDist(rng);
+    int midBlock = midRow * COLS + midCol;
+
+    /* Now we aim for the middle point */
+    generateStraightTrajectory(trajectory, start, midBlock, ROWS, COLS, rng,
+                               noise);
+    /* Then we go to the end */
+    generateStraightTrajectory(trajectory, midBlock, end, ROWS, COLS, rng,
+                               noise);
+    break;
+  }
+
+  case CURVED_2: {
+
+    /* Generates two random points between start and end with some deviation to
+     * simulate a more complex curved trajectory */
+
+    /* Generates the first midpoint between the start and the end */
+    std::uniform_int_distribution<int> midRow1Dist(
+        std::min(start / COLS, end / COLS), std::max(start / COLS, end / COLS));
+    std::uniform_int_distribution<int> midCol1Dist(
+        std::min(start % COLS, end % COLS), std::max(start % COLS, end % COLS));
+
+    int midRow1 = midRow1Dist(rng);
+    int midCol1 = midCol1Dist(rng);
+    int midBlock1 = midRow1 * COLS + midCol1;
+
+    /* Generates the second midpoint between the first midpoint and the end */
+    std::uniform_int_distribution<int> midRow2Dist(
+        std::min(midBlock1 / COLS, end / COLS),
+        std::max(midBlock1 / COLS, end / COLS));
+    std::uniform_int_distribution<int> midCol2Dist(
+        std::min(midBlock1 % COLS, end % COLS),
+        std::max(midBlock1 % COLS, end % COLS));
+
+    int midRow2 = midRow2Dist(rng);
+    int midCol2 = midCol2Dist(rng);
+    int midBlock2 = midRow2 * COLS + midCol2;
+
+    /* Goes to the first midpoint */
+    generateStraightTrajectory(trajectory, start, midBlock1, ROWS, COLS, rng,
+                               noise);
+
+    /* Goes to the second midpoint */
+    generateStraightTrajectory(trajectory, midBlock1, midBlock2, ROWS, COLS,
+                               rng, noise);
+    /* Goes to the end */
+    generateStraightTrajectory(trajectory, midBlock2, end, ROWS, COLS, rng,
+                               noise);
+    break;
+  }
+
+  default:
+    throw std::invalid_argument("Invalid trajectory shape");
+  }
 }
 
 std::vector<std::vector<int>>
 DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
                                          std::vector<int> &airportPositions) {
   std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
-  // std::uniform_int_distribution<int> lengthDist(TRAJ_LEN_MIN, TRAJ_LEN_MAX);
-  std::uniform_real_distribution<double> noise(-0.5, 0.5);
+  // std::uniform_int_distribution<int> lengthDist(TRAJ_LEN_MIN,
+  // TRAJ_LEN_MAX);
+  std::uniform_real_distribution<double> noise(-0.3, 0.3);
   std::uniform_int_distribution<int> airportDist(0, ROWS * COLS - 1);
 
   int nAirports = ROWS * COLS / 10;
@@ -149,13 +228,13 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
   int percAirportToAirport = 60;
   int percAirportToBorder = 100 - percBorderToBorder - percAirportToAirport;
   int nFlights = 300;
-  int nFlows = nFlights / 20; // estimate, shoud be adjusted
+  int nFlows = nFlights / 10; // estimate, shoud be adjusted
 
   std::vector<std::vector<int>> allTrajectories;
   std::uniform_int_distribution<int> airportChoiceDist(0, nAirports - 1);
 
   /* 1. Trajectories from airport A to airport B */
-  for (int i = 0; i < nFlows * percAirportToAirport / 100; i++) {
+  for (int i = 0; i < nFlows * percAirportToAirport / 100 / 3; i++) {
     int start = AirportPositions[airportChoiceDist(rng)];
     int end = AirportPositions[airportChoiceDist(rng)];
 
@@ -167,32 +246,33 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
       attempts++;
     }
 
-    std::vector<int> trajectory;
-    generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
-                             allTrajectories, rng, noise);
-    allTrajectories.push_back(trajectory);
+    for (TrajectoryShape shape : {STRAIGHT, CURVED_1, CURVED_2}) {
+      std::vector<int> trajectory;
+      generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
+                               allTrajectories, rng, noise, shape);
+      allTrajectories.push_back(trajectory);
+    }
   }
 
   /* 2. Trajectories from airport to border and viceversa */
-  for (int i = 0; i < nFlows * percAirportToBorder / 100; i++) {
+  for (int i = 0; i < nFlows * percAirportToBorder / 100 / 2; i++) {
     int start = AirportPositions[rng() % nAirports];
     int end;
-    if (rng() % 2 == 0) {
-      // Airport to border
-      int borderRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
-      int borderCol = rng() % COLS;
-      end = borderRow * COLS + borderCol;
-    } else {
-      // Border to airport
-      int borderRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
-      int borderCol = rng() % COLS;
-      end = borderRow * COLS + borderCol;
-    }
 
-    std::vector<int> trajectory;
-    generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
-                             allTrajectories, rng, noise);
-    allTrajectories.push_back(trajectory);
+    int borderRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
+    int borderCol = rng() % COLS;
+    end = borderRow * COLS + borderCol;
+
+    if (i % 2 == 0) {
+      std::swap(start, end); // half of the time, start from border to airport
+    } // else half of the time, start from airport to border
+
+    for (TrajectoryShape shape : {STRAIGHT, CURVED_1}) {
+      std::vector<int> trajectory;
+      generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
+                               allTrajectories, rng, noise, shape);
+      allTrajectories.push_back(trajectory);
+    }
   }
 
   /* 3. Trajectories from border to border */
@@ -224,8 +304,9 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
 
-  std::normal_distribution<double> ingressDist(0.6, 0.9);
-  std::normal_distribution<double> trafficVolNoise(0.8, 1.10);
+  std::normal_distribution<double> ingressDist(0.8 / NTIMESINONEHOUR,
+                                               0.4 / NTIMESINONEHOUR);
+  std::normal_distribution<double> trafficVolNoise(0.8, 1.6);
 
   std::ofstream out(filename);
 
@@ -418,9 +499,10 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   out << "id,time,scheduled_departures\n";
   for (int f = 0; f < allTrajectories.size(); f++) {
     for (int t = 0; t < NTIMES; t++) {
-      double baseDepartures = ingressDist(rng) *
-                              hourlyFactor(t / NTIMESINONEHOUR) *
-                              trafficVolNoise(rng) / NTIMESINONEHOUR;
+      double baseDepartures =
+          ingressDist(rng) * hourlyFactor(t / NTIMESINONEHOUR) /**
+                             trafficVolNoise(rng)*/
+          ;
       int departures = std::max(0, static_cast<int>(baseDepartures));
       out << f << "," << t << "," << departures << "\n";
     }

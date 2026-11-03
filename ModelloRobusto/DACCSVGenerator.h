@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <vector>
 
+enum TrajectoryShape { STRAIGHT, CURVED_1, CURVED_2 };
+
 class DACCSVGenerator {
 public:
   DACCSVGenerator(int ROWS = 20, int COLS = 20, int NHOURS = 24,
@@ -21,7 +23,8 @@ public:
                                 int end, int ROWS, int COLS,
                                 std::vector<std::vector<int>> &allTrajectories,
                                 std::mt19937 &rng,
-                                std::uniform_real_distribution<double> &noise);
+                                std::uniform_real_distribution<double> &noise,
+                                TrajectoryShape shape = STRAIGHT);
 
   std::vector<std::vector<int>>
   generateAllTrajectories(std::mt19937 &rng,
@@ -48,4 +51,8 @@ private:
   int MINCONFKEEPTIME;
   int NTIMESINONEHOUR;
   double EPSILON;
+  void
+  generateStraightTrajectory(std::vector<int> &trajectory, int start, int end,
+                             int ROWS, int COLS, std::mt19937 &rng,
+                             std::uniform_real_distribution<double> &noise);
 };

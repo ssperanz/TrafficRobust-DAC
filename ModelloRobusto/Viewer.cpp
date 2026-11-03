@@ -79,4 +79,31 @@ void Viewer::show() {
     }
     std::cout << "\n";
   }
+
+  /* Prints the flows path singularly on the grid */
+  for (const auto &flow : data.flows) {
+    std::cout << "Flow " << flow.id << " path:\n";
+    for (int r = 0; r < rows; ++r) {
+      for (int col = 0; col < cols; ++col) {
+        int abIndex = r * cols + col;
+        /* Prints every airblock in the grid, colours the flow path*/
+        if (std::find_if(flow.airblocks.begin(), flow.airblocks.end(),
+                         [abIndex](AirBlock *ab) {
+                           return ab->getIndex() == abIndex;
+                         }) != flow.airblocks.end()) {
+          auto color = palette[flow.id % palette.size()];
+
+          std::cout << "\033[48;2;" << color[0] << ";" << color[1] << ";"
+                    << color[2] << "m" << std::setw(4) << abIndex
+                    << (data.airblocks[abIndex].hasAirport ? "A" : " ")
+                    << "\033[0m";
+        } else {
+          std::cout << std::setw(4) << abIndex
+                    << (data.airblocks[abIndex].hasAirport ? "A" : " ");
+        }
+      }
+      std::cout << "\n";
+    }
+    std::cout << "\n";
+  }
 }
