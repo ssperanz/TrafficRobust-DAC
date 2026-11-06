@@ -14,29 +14,32 @@
 using namespace std;
 
 int main() {
+  std::ofstream file("TrafficRobustLog.txt");
+  std::ostream &out = file;
   try {
-    std::cout << "Generazione dati DAC..." << std::endl;
+
+    out << "Generazione dati DAC...\n";
     DACCSVGenerator generator(
         20, 20, 15, 6, 3, 20, 1, 5,
         1e-4); // parametri: ROWS, COLS, NTIMES, START_HOUR, MIN_SECTOR_LENGTH,
                // NCONFIGS, H, T_P, EPSILON
     generator.generateDACCSV("path.csv", 42);
-    std::cout << "Dati DAC generati e salvati in path.csv" << std::endl;
+    out << "Dati DAC generati e salvati in path.csv\n";
 
     GRBEnv env(true);
-    env.set("LogFile", "TrafficRobust-DAC.log");
-    std::cout << "Inizializzazione ambiente Gurobi..." << std::endl;
+    env.set("LogFile", "Gurobi.log");
+    out << "Inizializzazione ambiente Gurobi...\n";
     env.start();
 
-    std::cout << "inizio" << std::endl;
+    out << "Inizio\n";
     DACData data("path.csv");
-    std::cout << "lettura dati" << std::endl;
+    out << "Lettura dati\n";
     for (int c = 0; c < data.configurations.size(); c++) {
-      cout << "Configurazione " << c << endl;
+      out << "Configurazione " << c << endl;
 
       for (auto s : data.configurations[c].sectors) {
-        cout << " settore " << s->getIndex() << " cap t0=" << s->getCapacity(0)
-             << " traffic t0=" << s->getTraffic(0) << endl;
+        out << " settore " << s->getIndex() << " cap t0=" << s->getCapacity(0)
+            << " traffic t0=" << s->getTraffic(0) << endl;
       }
     }
     Viewer viewer(data);
@@ -47,32 +50,33 @@ int main() {
 
     bool converged = false;
     while (!converged) {
-      std::cout << "Iterazione " << master.iter << std::endl;
+      out << "Iterazione " << master.iter << "\n";
+      out << "Risoluzione Master\n";
       sol = master.solve();
       slave.update(sol);
 
-      cout << "Risoluzione slave" << endl;
+      out << "Risoluzione Slave" << endl;
       SlaveSolution slaveSol = slave.solve();
       double max_excess = slaveSol.excess;
       if (max_excess - sol.theta <= data.parameters.epsilon) {
-        cout << "Aggiustamento completato! Soluzione ottima trovata." << endl;
+        out << "Aggiustamento completato! Soluzione ottima trovata." << endl;
         converged = true;
         // Stampa risultati
         int T = data.grid.getNTimeslots();
         int C = data.configurations.size();
         if (sol.status == GRB_OPTIMAL) {
-          cout << "\n===== SOLUZIONE OTTIMA =====\n";
-          cout << "Valore obiettivo = " << sol.theta << "\n\n";
-          cout << "\nConfigurazioni attive:\n";
+          out << "\n===== SOLUZIONE OTTIMA =====\n";
+          out << "Valore obiettivo = " << sol.theta << "\n\n";
+          out << "\nConfigurazioni attive:\n";
           for (int t = 0; t < T; t++) {
             for (int c = 0; c < C; c++) {
               if (sol.x.at(t, c) > 0.5) {
-                cout << "t = " << t << " -> configurazione " << c << '\n';
+                out << "t = " << t << " -> configurazione " << c << '\n';
               }
             }
           }
 
-          cout << "\nSwitch di configurazione rilevati:\n";
+          out << "\nSwitch di configurazione rilevati:\n";
           for (int t = 0; t < T; t++) {
             for (int c = 0; c < C; c++) {
               bool switch_rilevato = false;
@@ -91,38 +95,40 @@ int main() {
               }
 
               if (switch_rilevato) {
-                cout << "t = " << t << " -> Attivata configurazione " << c;
+                out << "t = " << t << " -> Attivata configurazione " << c;
 
                 if (sol.s.at(t, c) < 0.5) {
-                  cout << " [ATTENZIONE: s_c^t non si è attivata correttamente "
-                          "nel solutore!]";
+                  out << " [ATTENZIONE: s_c^t non si è attivata correttamente "
+                         "nel solutore!]";
                 }
-                cout << '\n';
+                out << '\n';
               }
             }
           }
 
         } else {
-          cout << "Soluzione non ottima. Stato: " << sol.theta << endl;
+          out << "Soluzione non ottima. Stato: " << sol.theta << endl;
         }
       } else {
         master.addCut(slaveSol);
       }
       if (master.iter > 100) {
-        cout << "Numero massimo di iterazioni raggiunto. Interruzione del "
-                "processo."
-             << endl;
+        out << "Numero massimo di iterazioni raggiunto. Interruzione del "
+               "processo."
+            << endl;
         break;
       }
     }
 
   } catch (GRBException &e) {
-    cout << "Errore Gurobi " << e.getErrorCode() << ": " << e.getMessage()
-         << endl;
+    out << "Errore Gurobi " << e.getErrorCode() << ": " << e.getMessage()
+        << endl;
   } catch (const std::exception &e) {
-    cout << "Eccezione: " << e.what() << endl;
+    out << "Eccezione: " << e.what() << endl;
   } catch (...) {
-    cout << "Eccezione non identificata." << endl;
+    out << "Eccezione non identificata." << endl;
   }
+
+  file.close();
   return 0;
 }
