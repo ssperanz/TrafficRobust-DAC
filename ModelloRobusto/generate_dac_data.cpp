@@ -59,13 +59,14 @@ int Sector::getIndex() { return index; }
 
 //  CONFIGURATION
 
+/* Already calculated in auxData
 int Configuration::getExcess(int t) {
   double total = 0.0;
   for (int s = 0; s < sectors.size(); s++) {
     // total += sectors[s]->getExcess(t);
   }
   return total;
-}
+}*/
 
 bool Configuration::checkSimilarity(Configuration &c2) {
   int intersection = 0;
@@ -305,6 +306,7 @@ void DACData::calculateAuxData() {
       T, std::vector<std::vector<int>>(F, std::vector<int>(maxAbinFlow, 0)));
   aux.BigM.resize(T, 0);
 
+  // calculates tau_f_a and BigM
   for (int t = 0; t < T; t++) {
     for (int f = 0; f < F; f++) {
       Flow &flow = flows[f];
@@ -324,6 +326,63 @@ void DACData::calculateAuxData() {
       } else {
         aux.BigM[t] = aux.BigM[t - 1];
       }
+    }
+  }
+
+  // calculates traffic demand of airblock 'a' at time 't'
+  aux.q_t_a.resize(T, std::vector<int>(grid.getNRows() * grid.getNCols(), 0));
+  for (int t = 0; t < T; t++) {
+    for (AirBlock &ab : airblocks) {
+      int ab_id = ab.getIndex();
+      int sum = 0;
+      std::vector<int> flowsid =
+          ab.getFlows(); // flussi che attraversano l’airblock a
+      for (int f = 0; f < flowsid.size(); f++) {
+        int flowid = flowsid.at(f); //
+        Flow &flow = flows.at(flowid);
+        for (int tau = aux.tau_f_a[t][flowid][flow.findAbPositionInFlow(ab_id)];
+             tau <= t - flow.getTimeToReachAirBlock(ab_id); tau++) {
+          sum += flow.getScheduledDepartures(tau);
+          // sum += p.at(tau, flowid);
+        }
+      }
+      aux.q_t_a[t][ab_id] = sum;
+    }
+  }
+
+  // calculates traffic demand of sector 's' at time 't'
+  aux.Q_t_s.resize(T, std::vector<int>(sectors.size(), 0));
+  for (int t = 0; t < T; t++) {
+    for (Sector &sector : sectors) {
+      int sum = 0;
+      for (int tau = t; tau <= std::min(t + parameters.h - 1, T - 1); tau++) {
+        for (AirBlock *ab : sector.airblocks) {
+          sum += aux.q_t_a[tau][ab->getIndex()];
+        }
+      }
+      aux.Q_t_s[t][sector.index] = sum;
+    }
+  }
+
+  // calculates traffic excess of sector 's' at time 't'
+  aux.e_t_s.resize(T, std::vector<int>(sectors.size(), 0));
+  for (int t = 0; t < T; t++) {
+    for (Sector &sector : sectors) {
+      int s = sector.getIndex();
+      int capacity_s_t = sector.getCapacity(t);
+      aux.e_t_s[t][s] = aux.Q_t_s[t][s] - capacity_s_t;
+    }
+  }
+
+  // calculates traffic excess of configuration 'c' at time 't'
+  aux.E_t_c.resize(T, std::vector<int>(configurations.size(), 0));
+  for (int t = 0; t < T; t++) {
+    for (Configuration &config : configurations) {
+      int sum = 0;
+      for (Sector *s : config.sectors) {
+        sum += aux.e_t_s[t][s->getIndex()];
+      }
+      aux.E_t_c[t][config.id] = sum; // vincolo 6.49
     }
   }
 }

@@ -87,8 +87,8 @@ public:
 
   Sector(int index, std::vector<AirBlock *> blocks)
       : index(index), airblocks(blocks) {}
-  double getExcess(int t); // ritorna l'eccesso totale del settore
-                           // all'intervallo temporale t
+  // double getExcess(int t); // ritorna l'eccesso totale del settore
+  //  all'intervallo temporale t
   int getIndex();
   void setCapacity(std::vector<double> cap);
   double getCapacity(int t);
@@ -195,6 +195,14 @@ class AuxDataStructs {
 public:
   std::vector<std::vector<std::vector<int>>> tau_f_a; // for slave, 6.44
   std::vector<int> BigM;                              // for slave, 6.46
+  std::vector<std::vector<int>>
+      q_t_a; // traffic demand of airblock 'a' at time 't'
+  std::vector<std::vector<int>>
+      Q_t_s; // traffic demand of sector 's' at time 't'
+  std::vector<std::vector<int>>
+      e_t_s; // traffic excess of sector 's' at time 't'
+  std::vector<std::vector<int>>
+      E_t_c; // traffic excess of configuration 'c' at time 't'
 };
 
 class DACData {

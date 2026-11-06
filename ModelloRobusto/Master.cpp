@@ -28,19 +28,14 @@ Master::Master(DACData &data, GRBEnv &env)
           master_model.addVar(0.0, 1.0, 0.0, GRB_BINARY, s_name); // 6.41
     }
   }
-  //
-  //  GRBLinExpr TotalExcess = 0.0;
-  //  for (int t = 0; t < T; t++) {
-  //    for (int c = 0; c < C; c++) {
-  //      double PartialConfigurationCExcess = 0.0;
-  //      for (int i = 0; i < data.configurations[c].sectors.size(); i++) {
-  //        PartialConfigurationCExcess +=
-  //            data.configurations[c].sectors[i]->getExcess(t);
-  //      }
-  //      TotalExcess += PartialConfigurationCExcess * x.at(t, c);
-  //    }
-  //  }
-  //  master_model.addConstr(TotalExcess <= theta); // 6.34
+
+  GRBLinExpr TotalExcess = 0.0;
+  for (int t = 0; t < T; t++) {
+    for (int c = 0; c < C; c++) {
+      TotalExcess += data.aux.E_t_c[t][c] * x.at(t, c);
+    }
+  }
+  master_model.addConstr(TotalExcess <= theta); // 6.34
 
   for (int t = 0; t < T; t++) {
     GRBLinExpr sum = 0;
