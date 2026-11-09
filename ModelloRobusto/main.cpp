@@ -1,4 +1,5 @@
 #include "DACCSVGenerator.h"
+#include "Logger.h"
 #include "Matrix.h"
 #include "generate_dac_data.h"
 #include "gurobi_c++.h"
@@ -14,14 +15,15 @@
 using namespace std;
 
 int main() {
-  std::ofstream file("TrafficRobustLog.txt");
-  std::ostream &out = file;
+  Logger logger("TrafficRobustLog.txt");
+  std::ostream &out = logger.getStream();
+
   try {
 
     out << "Generazione dati DAC...\n";
     DACCSVGenerator generator(
-        20, 20, 15, 6, 3, 20, 1, 5,
-        1e-4); // parametri: ROWS, COLS, NTIMES, START_HOUR, MIN_SECTOR_LENGTH,
+        20, 20, 24, 0, 3, 10, 12, 2,
+        1e-4); // parametri: ROWS, COLS, NHOURS, START_HOUR, MIN_SECTOR_LENGTH,
                // NCONFIGS, H, T_P, EPSILON
     generator.generateDACCSV("path.csv", 42);
     out << "Dati DAC generati e salvati in path.csv\n";
@@ -31,32 +33,30 @@ int main() {
     out << "Inizializzazione ambiente Gurobi...\n";
     env.start();
 
-    out << "Inizio\n";
+    out << "Lettura dati...\n\n";
     DACData data("path.csv");
-    out << "Lettura dati\n";
-    for (int c = 0; c < data.configurations.size(); c++) {
-      out << "Configurazione " << c << endl;
+    out << "\n### DATI ###\n";
+    logger.logData(data);
 
-      for (auto s : data.configurations[c].sectors) {
-        out << " settore " << s->getIndex() << " cap t0=" << s->getCapacity(0)
-            << " traffic t0=" << s->getTraffic(0) << endl;
-      }
-    }
     Viewer viewer(data);
     viewer.show();
+
+    out << "### RISOLUZIONE ###\n";
     Master master(data, env);
     MasterSolution sol = master.solve();
     Slave slave(sol, env, data);
-
     bool converged = false;
     while (!converged) {
       out << "Iterazione " << master.iter << "\n";
-      out << "Risoluzione Master\n";
+      out << "  Risoluzione Master\n";
       sol = master.solve();
+      out << "  Valore obiettivo Master: " << sol.theta << "\n";
       slave.update(sol);
+      out << "  Aggiornamento Slave completato.\n\n";
 
-      out << "Risoluzione Slave" << endl;
+      out << "  Risoluzione Slave" << endl;
       SlaveSolution slaveSol = slave.solve();
+      out << "  Valore obiettivo Slave: " << slaveSol.excess << "\n";
       double max_excess = slaveSol.excess;
       if (max_excess - sol.theta <= data.parameters.epsilon) {
         out << "Aggiustamento completato! Soluzione ottima trovata." << endl;
@@ -129,6 +129,5 @@ int main() {
     out << "Eccezione non identificata." << endl;
   }
 
-  file.close();
   return 0;
 }

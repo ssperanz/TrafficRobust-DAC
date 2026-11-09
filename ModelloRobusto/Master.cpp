@@ -14,9 +14,9 @@ Master::Master(DACData &data, GRBEnv &env)
     : T(data.grid.getNTimeslots()), C(data.getNConfigurations()), x(T, C),
       s(T, C), env(env), master_model(env), data(data), iter(0) {
   int t_p = data.parameters.t_p;
-  // std::cout << "Numero di timeslots: " << T << std::endl;
-  // std::cout << "Costruzione modello master..." << std::endl;
-  //  TODO?? 6.34 con valori nominali
+
+  // Inizializza la variabile theta
+  theta = master_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "theta");
 
   for (int t = 0; t < T; t++) {
     for (int c = 0; c < C; c++) {
@@ -75,9 +75,6 @@ Master::Master(DACData &data, GRBEnv &env)
     }
     master_model.addConstr(sum <= 1);
   }
-
-  // Inizializza la variabile theta
-  theta = master_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "theta");
 
   // Sincronizza il modello
   master_model.update();

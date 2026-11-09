@@ -113,33 +113,31 @@ void DACCSVGenerator::generateStraightTrajectory(
     int row = last / COLS;
     int col = last % COLS;
 
-    double dr = std::clamp((double)(end / COLS - row), -1.0, 1.0) + noise(rng);
-    double dc = std::clamp((double)(end % COLS - col), -1.0, 1.0) + noise(rng);
+    int dr = end / COLS - row;
+    int dc = end % COLS - col;
+    std::uniform_int_distribution<int> chance(1, std::abs(dr) + std::abs(dc));
 
     int nextRmove = 0;
     int nextCmove = 0;
 
-    if (std::abs(dr) > std::abs(dc)) {
+    int choice = chance(rng);
+    if (choice <= std::abs(dr)) {
       nextRmove = (dr > 0) ? 1 : -1;
-    } else if (std::abs(dc) > std::abs(dr)) {
-      nextCmove = (dc > 0) ? 1 : -1;
     } else {
-      // If dr and dc are equal, randomly choose to move in either direction
-      if (rng() % 2 == 0) {
-        nextRmove = (dr > 0) ? 1 : -1;
-      } else {
-        nextCmove = (dc > 0) ? 1 : -1;
-      }
+      nextCmove = (dc > 0) ? 1 : -1;
     }
 
     int newRow = row + nextRmove;
     int newCol = col + nextCmove;
 
-    int newBlock = newRow * COLS + newCol;
-
-    trajectory.push_back(newBlock);
+    if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS) {
+      break;
+    } else {
+      int newBlock = newRow * COLS + newCol;
+      trajectory.push_back(newBlock);
+    }
+    // Already adds the end block in the loop
   }
-  // Already adds the end block in the loop
 }
 
 void DACCSVGenerator::generateSingleTrajectory(
@@ -160,29 +158,72 @@ void DACCSVGenerator::generateSingleTrajectory(
      * simulate a curved trajectory */
     int midRow = 0;
     int midCol = 0;
+    bool rand = rng() % 2 == 0;
+    int dr = (start / COLS - end / COLS);
+    int dc = (start % COLS - end % COLS);
 
-    if (std::abs(start / COLS - end / COLS) < 2) {
+    if (std::abs(dr) < 2) {
+      midRow = (start / COLS + end / COLS) / 2 + (rand ? 1 : -1);
+      if (midRow < 0 || midRow >= ROWS) {
+        midRow = std::max(0, std::min(ROWS - 1, midRow));
+      }
+      std::uniform_int_distribution<int> midColDist(
+          std::min(start % COLS + std::abs(dc) / 3,
+                   end % COLS + std::abs(dc) / 3),
+          std::max(start % COLS - std::abs(dc) / 3,
+                   end % COLS - std::abs(dc) / 3));
+      midCol = midColDist(rng);
+    } else if (std::abs(dc) < 2) {
+      midCol = (start % COLS + end % COLS) / 2 + (rand ? 1 : -1);
+      if (midCol < 0 || midCol >= COLS) {
+        midCol = std::max(0, std::min(COLS - 1, midCol));
+      }
       std::uniform_int_distribution<int> midRowDist(
-          std::min(std::max(0, start / COLS - 2), std::max(0, end / COLS - 2)),
-          std::max(std::min(ROWS - 1, start / COLS + 2),
-                   std::min(ROWS - 1, end / COLS + 2)));
+          std::min(start / COLS + std::abs(dr) / 3,
+                   end / COLS + std::abs(dr) / 3),
+          std::max(start / COLS - std::abs(dr) / 3,
+                   end / COLS - std::abs(dr) / 3));
       midRow = midRowDist(rng);
-    } else {
+    } else if (std::abs(dr) > std::abs(dc)) {
+      if (dr > 0) {
+        std::uniform_int_distribution<int> midRowDist(
+            end / COLS + std::abs(dr) / 3, start / COLS - std::abs(dr) / 3);
+        midRow = midRowDist(rng);
+      } else {
+        std::uniform_int_distribution<int> midRowDist(
+            start / COLS + std::abs(dr) / 3, end / COLS - std::abs(dr) / 3);
+        midRow = midRowDist(rng);
+      }
+      std::uniform_int_distribution<int> midColDist(
+          std::min(start % COLS, end % COLS),
+          std::max(start % COLS, end % COLS));
+      midCol = midColDist(rng);
+    } else if (std::abs(dr) < std::abs(dc)) {
+      if (dc > 0) {
+        std::uniform_int_distribution<int> midColDist(
+            end % COLS + std::abs(dc) / 3, start % COLS - std::abs(dc) / 3);
+        midCol = midColDist(rng);
+      } else {
+        std::uniform_int_distribution<int> midColDist(
+            start % COLS + std::abs(dc) / 3, end % COLS - std::abs(dc) / 3);
+        midCol = midColDist(rng);
+      }
       std::uniform_int_distribution<int> midRowDist(
           std::min(start / COLS, end / COLS),
           std::max(start / COLS, end / COLS));
       midRow = midRowDist(rng);
-    }
-    if (std::abs(start % COLS - end % COLS) < 2) {
-      std::uniform_int_distribution<int> midColDist(
-          std::min(std::max(0, start % COLS - 2), std::max(0, end % COLS - 2)),
-          std::max(std::min(COLS - 1, start % COLS + 2),
-                   std::min(COLS - 1, end % COLS + 2)));
-      midCol = midColDist(rng);
     } else {
+      std::uniform_int_distribution<int> midRowDist(
+          std::min(start / COLS + std::abs(dr) / 3,
+                   end / COLS + std::abs(dr) / 3),
+          std::max(start / COLS - std::abs(dr) / 3,
+                   end / COLS - std::abs(dr) / 3));
+      midRow = midRowDist(rng);
       std::uniform_int_distribution<int> midColDist(
-          std::min(start % COLS, end % COLS),
-          std::max(start % COLS, end % COLS));
+          std::min(start % COLS + std::abs(dc) / 3,
+                   end % COLS + std::abs(dc) / 3),
+          std::max(start % COLS - std::abs(dc) / 3,
+                   end % COLS - std::abs(dc) / 3));
       midCol = midColDist(rng);
     }
 
@@ -199,61 +240,32 @@ void DACCSVGenerator::generateSingleTrajectory(
 
   case CURVED_2: {
 
-    /* Generates two random points between start and end with some deviation to
-     * simulate a more complex curved trajectory */
+    /* Generates a random point between start and end with some deviation to
+     * simulate a curved trajectory */
 
-    /* Generates the first midpoint between the start and the end */
-    int midRow1 = 0;
-    int midCol1 = 0;
+    int dr = (start / COLS - end / COLS);
+    int dc = (start % COLS - end % COLS);
 
-    if (std::abs(start / COLS - end / COLS) < 2) {
-      std::uniform_int_distribution<int> midRow1Dist(
-          std::min(std::max(0, start / COLS - 2), std::max(0, end / COLS - 2)),
-          std::max(std::min(ROWS - 1, start / COLS + 2),
-                   std::min(ROWS - 1, end / COLS + 2)));
-      midRow1 = midRow1Dist(rng);
-    } else {
-      std::uniform_int_distribution<int> midRow1Dist(
-          std::min(start / COLS, end / COLS),
-          std::max(start / COLS, end / COLS));
-      midRow1 = midRow1Dist(rng);
-    }
-    if (std::abs(start % COLS - end % COLS) < 2) {
-      std::uniform_int_distribution<int> midCol1Dist(
-          std::min(std::max(0, start % COLS - 2), std::max(0, end % COLS - 2)),
-          std::max(std::min(COLS - 1, start % COLS + 2),
-                   std::min(COLS - 1, end % COLS + 2)));
-      midCol1 = midCol1Dist(rng);
-    } else {
-      std::uniform_int_distribution<int> midCol1Dist(
-          std::min(start % COLS, end % COLS),
-          std::max(start % COLS, end % COLS));
-      midCol1 = midCol1Dist(rng);
-    }
+    std::uniform_int_distribution<int> midRowDist(
+        std::min(start / COLS + std::abs(dr) / 3,
+                 end / COLS + std::abs(dr) / 3),
+        std::max(start / COLS - std::abs(dr) / 3,
+                 end / COLS - std::abs(dr) / 3));
+    int midRow = midRowDist(rng);
+    std::uniform_int_distribution<int> midColDist(
+        std::min(start % COLS + std::abs(dc) / 3,
+                 end % COLS + std::abs(dc) / 3),
+        std::max(start % COLS - std::abs(dc) / 3,
+                 end % COLS - std::abs(dc) / 3));
+    int midCol = midColDist(rng);
 
-    int midBlock1 = midRow1 * COLS + midCol1;
+    int midBlock = midRow * COLS + midCol;
 
-    /* Generates the second midpoint between the first midpoint and the end */
-    std::uniform_int_distribution<int> midRow2Dist(
-        std::min(midBlock1 / COLS, end / COLS),
-        std::max(midBlock1 / COLS, end / COLS));
-    std::uniform_int_distribution<int> midCol2Dist(
-        std::min(midBlock1 % COLS, end % COLS),
-        std::max(midBlock1 % COLS, end % COLS));
-
-    int midRow2 = midRow2Dist(rng);
-    int midCol2 = midCol2Dist(rng);
-    int midBlock2 = midRow2 * COLS + midCol2;
-
-    /* Goes to the first midpoint */
-    generateStraightTrajectory(trajectory, start, midBlock1, ROWS, COLS, rng,
+    /* Now we aim for the middle point */
+    generateStraightTrajectory(trajectory, start, midBlock, ROWS, COLS, rng,
                                noise);
-
-    /* Goes to the second midpoint */
-    generateStraightTrajectory(trajectory, midBlock1, midBlock2, ROWS, COLS,
-                               rng, noise);
-    /* Goes to the end */
-    generateStraightTrajectory(trajectory, midBlock2, end, ROWS, COLS, rng,
+    /* Then we go to the end */
+    generateStraightTrajectory(trajectory, midBlock, end, ROWS, COLS, rng,
                                noise);
     break;
   }
@@ -287,8 +299,7 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
   int percBorderToBorder = 10;
   int percAirportToAirport = 60;
   int percAirportToBorder = 100 - percBorderToBorder - percAirportToAirport;
-  int nFlights = 300;
-  int nFlows = nFlights / 10; // estimate, shoud be adjusted
+  int nFlows = 100; // estimate, shoud be adjusted
 
   std::vector<std::vector<int>> allTrajectories;
   std::uniform_int_distribution<int> airportChoiceDist(0, nAirports - 1);
@@ -321,7 +332,8 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
     end = borderRow * COLS + borderCol;
 
     if (i % 2 == 0) {
-      std::swap(start, end); // half of the time, start from border to airport
+      std::swap(start,
+                end); // half of the time, start from border to airport
     } // else half of the time, start from airport to border
 
     for (TrajectoryShape shape : {STRAIGHT, CURVED_1}) {
@@ -380,8 +392,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
 
-  std::normal_distribution<double> ingressDist(0.8 / NTIMESINONEHOUR,
-                                               0.4 / NTIMESINONEHOUR);
+  std::normal_distribution<double> ingressDist(0.28, 0.4);
   std::normal_distribution<double> trafficVolNoise(0.8, 1.6);
 
   std::ofstream out(filename);
@@ -575,11 +586,10 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   out << "id,time,scheduled_departures\n";
   for (int f = 0; f < allTrajectories.size(); f++) {
     for (int t = 0; t < NTIMES; t++) {
-      double baseDepartures =
-          ingressDist(rng) * hourlyFactor(t / NTIMESINONEHOUR) /**
-                             trafficVolNoise(rng)*/
-          ;
+      double baseDepartures = ingressDist(rng); /* hourlyFactor(t /
+                              NTIMESINONEHOUR) /** trafficVolNoise(rng); */
       int departures = std::max(0, static_cast<int>(baseDepartures));
+      departures = std::min(departures, 1);
       out << f << "," << t << "," << departures << "\n";
     }
   }

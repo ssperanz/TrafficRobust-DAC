@@ -147,7 +147,7 @@ void Flow::setScheduledDepartures(std::vector<int> departures) {
   num_of_scheduled_departures = departures;
 }
 
-int Flow::findAbPositionInFlow(int ab_id) {
+int Flow::findAbIdxPositionInFlow(int ab_id) {
   for (int i = 0; i < airblocks.size(); ++i) {
     if (airblocks[i]->getIndex() == ab_id) {
       return i;
@@ -340,7 +340,8 @@ void DACData::calculateAuxData() {
       for (int f = 0; f < flowsid.size(); f++) {
         int flowid = flowsid.at(f); //
         Flow &flow = flows.at(flowid);
-        for (int tau = aux.tau_f_a[t][flowid][flow.findAbPositionInFlow(ab_id)];
+        for (int tau =
+                 aux.tau_f_a[t][flowid][flow.findAbIdxPositionInFlow(ab_id)];
              tau <= t - flow.getTimeToReachAirBlock(ab_id); tau++) {
           sum += flow.getScheduledDepartures(tau);
           // sum += p.at(tau, flowid);
@@ -370,7 +371,7 @@ void DACData::calculateAuxData() {
     for (Sector &sector : sectors) {
       int s = sector.getIndex();
       int capacity_s_t = sector.getCapacity(t);
-      aux.e_t_s[t][s] = aux.Q_t_s[t][s] - capacity_s_t;
+      aux.e_t_s[t][s] = std::max(0, aux.Q_t_s[t][s] - capacity_s_t);
     }
   }
 
@@ -383,6 +384,14 @@ void DACData::calculateAuxData() {
         sum += aux.e_t_s[t][s->getIndex()];
       }
       aux.E_t_c[t][config.id] = sum; // vincolo 6.49
+    }
+  }
+
+  // calculates total number of flights
+  aux.totalFlights = 0;
+  for (int t = 0; t < T; t++) {
+    for (Flow &flow : flows) {
+      aux.totalFlights += flow.getScheduledDepartures(t);
     }
   }
 }

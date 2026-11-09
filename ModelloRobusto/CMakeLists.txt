@@ -13,6 +13,7 @@ add_executable(TrafficRobust-DAC
     main.cpp
     Master.cpp
     Slave.cpp
+    Logger.cpp
     Viewer.cpp
     generate_dac_data.cpp
     DACCSVGenerator.cpp

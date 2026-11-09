@@ -150,9 +150,9 @@ public:
                           // of aircraft in flow 'f' that are still in
                           // airspace block 'a' at time 't'.
   void setScheduledDepartures(std::vector<int> departures);
-  int findAbPositionInFlow(
-      int ab_id); // restituisce l'indice posizionale dell'airblock
-                  // nell'array airblocks del flusso
+  int findAbIdxPositionInFlow(
+      int ab_idx); // restituisce l'id dell'airblock dato l'indice posizionale
+                   // dell'airblock nell'array airblocks del flusso
 };
 
 class Grid {
@@ -191,7 +191,7 @@ private:
            // diverse */
 };
 
-class AuxDataStructs {
+class AuxData {
 public:
   std::vector<std::vector<std::vector<int>>> tau_f_a; // for slave, 6.44
   std::vector<int> BigM;                              // for slave, 6.46
@@ -202,7 +202,8 @@ public:
   std::vector<std::vector<int>>
       e_t_s; // traffic excess of sector 's' at time 't'
   std::vector<std::vector<int>>
-      E_t_c; // traffic excess of configuration 'c' at time 't'
+      E_t_c;        // traffic excess of configuration 'c' at time 't'
+  int totalFlights; // total number of flights
 };
 
 class DACData {
@@ -210,7 +211,7 @@ public:
   DACData(const std::string &filename);
   Parameters parameters;
   Grid grid;
-  AuxDataStructs aux;
+  AuxData aux;
   std::vector<Sector> sectors;
   std::vector<Configuration> configurations;
   std::vector<AirBlock> airblocks;
