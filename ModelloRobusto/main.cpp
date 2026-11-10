@@ -22,9 +22,9 @@ int main() {
 
     out << "Generazione dati DAC...\n";
     DACCSVGenerator generator(
-        20, 20, 24, 0, 3, 10, 12, 2,
-        1e-4); // parametri: ROWS, COLS, NHOURS, START_HOUR, MIN_SECTOR_LENGTH,
-               // NCONFIGS, H, T_P, EPSILON
+        20, 20, 24, 0, 3, 50, 50, 12, 4, 1e-4,
+        0.15); // parametri: ROWS, COLS, NHOURS, START_HOUR, MIN_SECTOR_LENGTH,
+               // NCONFIGS, NFLOWS, H, T_P, EPSILON, MU_DEPARTURES_DIST
     generator.generateDACCSV("path.csv", 42);
     out << "Dati DAC generati e salvati in path.csv\n";
 

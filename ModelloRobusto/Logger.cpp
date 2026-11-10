@@ -72,8 +72,12 @@ void Logger::printGrids(DACData &data) {
     logFile << "Partenze programmate ai timeslot: \n";
     for (int t = 0; t < flow.num_of_scheduled_departures.size(); ++t) {
       if (flow.num_of_scheduled_departures[t] > 0) {
-        logFile << "t = " << t << ": " << flow.num_of_scheduled_departures[t]
-                << "\n";
+        logFile << "  (" << data.parameters.start_hour + t / data.parameters.h
+                << ":" << std::setw(2) << std::setfill('0')
+                << (t % data.parameters.h) * (60 / data.parameters.h) << "), "
+                << "t = " << t << ": " << flow.num_of_scheduled_departures[t]
+                << "\n"
+                << std::setfill(' '); // Reset fill character to default
       }
     }
     logFile << "\n\n";
@@ -82,7 +86,7 @@ void Logger::printGrids(DACData &data) {
   // stampa domanda di traffico per ogni airblock
   logFile << "\nDomanda di traffico per ogni airblock:\n";
   for (int t = 0; t < data.grid.getNTimeslots(); t++) {
-    logFile << "Domanda degli airblock al tempo t: " << t << ":\n";
+    logFile << "  Domanda degli airblock al tempo t: " << t << ":\n";
     for (int r = 0; r < rows; ++r) {
       for (int col = 0; col < cols; ++col) {
         int abIndex = r * cols + col;
@@ -114,7 +118,7 @@ void Logger::logData(DACData &data) {
   logFile << "Numero di slot temporali: " << data.grid.getNTimeslots() << "\n";
   logFile << "Tolleranza per convergenza: " << data.parameters.epsilon << "\n";
   logFile
-      << "Minimo numero di slot temporali per mantenere una configurazione: "
+      << "Minimo numero di slot temporali in cui mantenere una configurazione: "
       << data.parameters.t_p << "\n";
 
   logFile << "\n";
@@ -123,28 +127,28 @@ void Logger::logData(DACData &data) {
   logFile << "Domanda di traffico, capacità e eccesso per ogni settore:\n";
   for (int t = 0; t < data.grid.getNTimeslots(); t++) {
     // stampa domanda di traffico, capacità e eccesso per ogni settore
-    logFile << "Timeslot " << t << ":\n";
+    logFile << "  Timeslot " << t << ":\n";
     for (Sector &sector : data.sectors) {
       int s = sector.getIndex();
-      logFile << "  Settore " << s << ", t = " << t
+      logFile << "    Settore " << s << ", t = " << t
               << ": domanda = " << data.aux.Q_t_s[t][s]
               << ", capacità = " << sector.getCapacity(t)
               << ", eccesso = " << data.aux.e_t_s[t][s] << "\n";
     }
   }
 
-  logFile << "\n";
+  logFile << "\n\n";
 
   logFile << "Domanda di traffico totale e eccesso per ogni configurazione:\n";
   // per ogni configurazione, stampa domanda di traffico e eccesso
   for (int t = 0; t < data.grid.getNTimeslots(); t++) {
-    logFile << "Timeslot " << t << ":\n";
+    logFile << "  Timeslot " << t << ":\n";
     for (Configuration &config : data.configurations) {
       int domanda = 0;
       for (Sector *s : config.sectors) {
         domanda += data.aux.Q_t_s[t][s->getIndex()];
       }
-      logFile << "  Configurazione " << config.id << ", t = " << t
+      logFile << "    Configurazione " << config.id << ", t = " << t
               << ": domanda = " << domanda
               << ", eccesso = " << data.aux.E_t_c[t][config.id] << "\n";
     }

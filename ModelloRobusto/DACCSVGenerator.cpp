@@ -1,11 +1,13 @@
 #include "DACCSVGenerator.h"
 
 DACCSVGenerator::DACCSVGenerator(int rows, int cols, int nhours, int startHour,
-                                 int min_sector_length, int nconfigs, int h,
-                                 int t_p, double epsilon)
+                                 int min_sector_length, int nconfigs,
+                                 int NFLOWS, int h, int t_p, double epsilon,
+                                 double mu_departures_dist)
     : ROWS(rows), COLS(cols), NTIMES(nhours * h), STARTHOUR(startHour),
       NSECTORS(0), MINSECTORLENGTH(min_sector_length), NCONFIGS(nconfigs),
-      NTIMESINONEHOUR(h), MINCONFKEEPTIME(t_p), EPSILON(epsilon) {}
+      NFLOWS(NFLOWS), NTIMESINONEHOUR(h), MINCONFKEEPTIME(t_p),
+      EPSILON(epsilon), MU_DEPARTURES_DIST(mu_departures_dist) {}
 
 // TODO: to fix considering also h and startHour
 double DACCSVGenerator::hourlyFactor(int t) {
@@ -103,7 +105,7 @@ void DACCSVGenerator::partition(
               maxSectors - (maxSectors / 2), sectorsCoordinates, rng);
   }
 }
-/* TODO: to fix*/
+
 void DACCSVGenerator::generateStraightTrajectory(
     std::vector<int> &trajectory, int start, int end, int ROWS, int COLS,
     std::mt19937 &rng, std::uniform_real_distribution<double> &noise) {
@@ -299,13 +301,12 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
   int percBorderToBorder = 10;
   int percAirportToAirport = 60;
   int percAirportToBorder = 100 - percBorderToBorder - percAirportToAirport;
-  int nFlows = 100; // estimate, shoud be adjusted
 
   std::vector<std::vector<int>> allTrajectories;
   std::uniform_int_distribution<int> airportChoiceDist(0, nAirports - 1);
 
   /* 1. Trajectories from airport A to airport B */
-  for (int i = 0; i < nFlows * percAirportToAirport / 100 / 3; i++) {
+  for (int i = 0; i < NFLOWS * percAirportToAirport / 100 / 3; i++) {
     int start = AirportPositions[airportChoiceDist(rng)];
     int end = AirportPositions[airportChoiceDist(rng)];
 
@@ -323,7 +324,7 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
   }
 
   /* 2. Trajectories from airport to border and viceversa */
-  for (int i = 0; i < nFlows * percAirportToBorder / 100 / 2; i++) {
+  for (int i = 0; i < NFLOWS * percAirportToBorder / 100 / 2; i++) {
     int start = AirportPositions[rng() % nAirports];
     int end;
 
@@ -345,7 +346,7 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
   }
 
   /* 3. Trajectories from border to border */
-  for (int i = 0; i < nFlows * percBorderToBorder / 100; i++) {
+  for (int i = 0; i < NFLOWS * percBorderToBorder / 100; i++) {
     int startRow, startCol, endRow, endCol;
     if (rng() % 2 == 0) {
       startRow = (rng() % 2 == 0) ? 0 : ROWS - 1;
@@ -388,11 +389,11 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
 
   std::uniform_int_distribution<int> blockDist(0, ROWS * COLS - 1);
   std::uniform_int_distribution<int> sectorSizeDist(2, 15);
-  std::uniform_real_distribution<double> capacityDist(15.0, 25.0);
+  std::uniform_real_distribution<double> capacityDist(20.0, 25.0);
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
 
-  std::normal_distribution<double> ingressDist(0.28, 0.4);
+  std::normal_distribution<double> ingressDist(MU_DEPARTURES_DIST, 0.4);
   std::normal_distribution<double> trafficVolNoise(0.8, 1.6);
 
   std::ofstream out(filename);
