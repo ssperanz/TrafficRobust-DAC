@@ -12,11 +12,12 @@
 
 class Parameters {
 public:
+  int start_hour; // starting hour of the time horizon
   int h;          // number of timeslots in one hour
   int t_p;        // minimum number of timeslots for a configuration to be kept
   double epsilon; // tolerance for convergence
-  Parameters(int h, int t_p, double epsilon)
-      : h(h), t_p(t_p), epsilon(epsilon) {}
+  Parameters(int start_hour, int h, int t_p, double epsilon)
+      : start_hour(start_hour), h(h), t_p(t_p), epsilon(epsilon) {}
 };
 
 class TimeSlot {

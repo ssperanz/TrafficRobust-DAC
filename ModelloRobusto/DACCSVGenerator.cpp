@@ -402,8 +402,8 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   //-----------------------------
   out << "[PARAMETERS]\n";
   out << "h,t_p,epsilon\n";
-  out << NTIMESINONEHOUR << "," << MINCONFKEEPTIME << "," << EPSILON
-      << "\n\n"; // h, t_p, epsilon
+  out << STARTHOUR << "," << NTIMESINONEHOUR << "," << MINCONFKEEPTIME << ","
+      << EPSILON << "\n\n"; // h, t_p, epsilon
 
   //-----------------------------
   // TIME

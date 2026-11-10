@@ -188,6 +188,7 @@ Parameters DACData::readParameters(const std::string &filename) {
   std::string line;
   std::string section;
 
+  int start_hour = 0;
   int h = 0;
   int t_p = 0;
   double epsilon = 0.0;
@@ -207,13 +208,14 @@ Parameters DACData::readParameters(const std::string &filename) {
     else if (section == "[PARAMETERS]") {
       auto f = split(line, ',');
 
-      h = stoi(f[0]);
-      t_p = stoi(f[1]);
-      epsilon = stod(f[2]);
+      start_hour = stoi(f[0]);
+      h = stoi(f[1]);
+      t_p = stoi(f[2]);
+      epsilon = stod(f[3]);
     }
   }
 
-  return Parameters(h, t_p, epsilon);
+  return Parameters(start_hour, h, t_p, epsilon);
 }
 
 Grid DACData::readGrid(const std::string &filename) {

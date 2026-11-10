@@ -104,9 +104,14 @@ void Logger::logData(DACData &data) {
   logFile << "Numero di settori: " << data.sectors.size() << "\n";
   logFile << "Numero di traiettorie: " << data.flows.size() << "\n";
   logFile << "Numero totale di voli: " << data.aux.totalFlights << "\n";
-  logFile << "Numero di slot temporali: " << data.grid.getNTimeslots() << "\n";
+  logFile << "Ora di inizio: " << data.parameters.start_hour << ":00\n";
+  logFile << "Ora di fine: "
+          << (data.parameters.start_hour +
+              data.grid.getNTimeslots() / data.parameters.h)
+          << ":00\n";
   logFile << "Intervallo di discretizzazione temporale: "
           << 60 / data.parameters.h << " minuti\n";
+  logFile << "Numero di slot temporali: " << data.grid.getNTimeslots() << "\n";
   logFile << "Tolleranza per convergenza: " << data.parameters.epsilon << "\n";
   logFile
       << "Minimo numero di slot temporali per mantenere una configurazione: "
