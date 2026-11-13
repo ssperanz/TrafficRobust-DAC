@@ -2,8 +2,9 @@
 #include "Master.h"
 
 Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
-    : T(data.grid.getNTimeslots()), env(env), solution(sol), slave_model(env),
-      data(data), p(T, data.flows.size()), q(T, data.airblocks.size()),
+    : T(data.grid.getNTimeslots()), env(env), solutionX(sol.x),
+      solutionTheta(sol.theta), slave_model(env), data(data),
+      p(T, data.flows.size()), q(T, data.airblocks.size()),
       Q(T, data.sectors.size()), e(T, data.sectors.size()),
       E(T, data.configurations.size()), w(T, data.sectors.size()) {
   // std::cout << "Costruzione modello slave..." << std::endl;
@@ -127,27 +128,28 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
 
 void Slave::constructObjective() {
   GRBLinExpr sum = 0.0;
-  for (int t = 0; t < solution.x.getnrows(); t++) {
-    for (int c = 0; c < solution.x.getncols(); c++) {
-      GRBLinExpr excess = 0.0;
-      for (int i = 0; i < data.configurations[c].sectors.size(); i++) {
-        excess += e.at(t, data.configurations[c].sectors[i]->getIndex());
-      }
-
-      sum += solution.x.at(t, c) * excess;
+  for (int t = 0; t < solutionX.getnrows(); t++) {
+    for (int c = 0; c < solutionX.getncols(); c++) {
+      sum += E.at(t, c) * solutionX.at(t, c);
     }
   }
+  // sum -= solutionTheta; // non necessario
 
   slave_model.setObjective(sum, GRB_MAXIMIZE);
   obj = sum;
 }
 
 void Slave::update(MasterSolution &s) {
-  slave_model.write("slave_model.lp");
+  // slave_model.write("slave_model.lp");
+  solutionX = s.x;
+  solutionTheta = s.theta;
+
   this->constructObjective();
 }
 
 SlaveSolution Slave::solve() {
+  slave_model.set(GRB_IntParam_MIPFocus, 2);
+  slave_model.set(GRB_DoubleParam_Heuristics, 0.2);
   slave_model.optimize();
   SlaveSolution slaveSol(slave_model.get(GRB_DoubleAttr_ObjVal), e);
   return slaveSol;

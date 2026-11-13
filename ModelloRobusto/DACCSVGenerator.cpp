@@ -389,7 +389,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
 
   std::uniform_int_distribution<int> blockDist(0, ROWS * COLS - 1);
   std::uniform_int_distribution<int> sectorSizeDist(2, 15);
-  std::uniform_real_distribution<double> capacityDist(20.0, 25.0);
+  std::uniform_real_distribution<double> capacityDist(40.0, 50.0);
   std::normal_distribution<double> capacityNoise(1.0, 0.05);
   std::normal_distribution<double> noise(1.0, 0.15);
 
@@ -585,15 +585,39 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
 
   out << "[DEPARTURES]\n";
   out << "id,time,scheduled_departures\n";
+  int nDeparturesForFlow[allTrajectories.size()] = {0};
+  std::uniform_int_distribution<int> flightsDist(0, allTrajectories.size() - 1);
+  std::uniform_int_distribution<int> timeDist(0, NTIMES - 1);
+
+  for (int f = 0; f < NFLIGHTS; f++) {
+    int flowId = flightsDist(rng);
+    nDeparturesForFlow[flowId] += 1;
+  }
+
   for (int f = 0; f < allTrajectories.size(); f++) {
+    int departures[NTIMES] = {0};
+    for (int flight = 0; flight < nDeparturesForFlow[f]; flight++) {
+      int time = 0;
+      do {
+        time = timeDist(rng);
+      } while (departures[time] >=
+               1); // Ensure only one departure per time slot
+      departures[time] += 1;
+    }
     for (int t = 0; t < NTIMES; t++) {
-      double baseDepartures = ingressDist(rng); /* hourlyFactor(t /
-                              NTIMESINONEHOUR) /** trafficVolNoise(rng); */
-      int departures = std::max(0, static_cast<int>(baseDepartures));
-      departures = std::min(departures, 1);
-      out << f << "," << t << "," << departures << "\n";
+      out << f << "," << t << "," << departures[t] << "\n";
     }
   }
+
+  // for (int f = 0; f < allTrajectories.size(); f++) {
+  //   for (int t = 0; t < NTIMES; t++) {
+  //     double baseDepartures = ingressDist(rng); /* hourlyFactor(t /
+  //                             NTIMESINONEHOUR) /** trafficVolNoise(rng); */
+  //     int departures = std::max(0, static_cast<int>(baseDepartures));
+  //     departures = std::min(departures, 1);
+  //     out << f << "," << t << "," << departures << "\n";
+  //   }
+  // }
 
   out.close();
 

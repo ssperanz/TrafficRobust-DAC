@@ -81,7 +81,7 @@ Master::Master(DACData &data, GRBEnv &env)
 
   master_model.setObjective(theta, GRB_MINIMIZE);
 
-  master_model.write("master_model.lp");
+  // master_model.write("master_model.lp");
 }
 
 void Master::addCut(SlaveSolution &slaveSol) {

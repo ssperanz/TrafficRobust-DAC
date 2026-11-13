@@ -1,6 +1,6 @@
 #pragma once
+#include "DACData.h"
 #include "Matrix.h"
-#include "generate_dac_data.h"
 #include "gurobi_c++.h"
 #include <iostream>
 #include <vector>
@@ -22,7 +22,9 @@ class Slave {
 
   GRBEnv env;
   GRBModel slave_model;
-  MasterSolution &solution;
+  // MasterSolution &solution;
+  Matrix<double> solutionX;
+  double solutionTheta;
   DACData data;
 
 public:
