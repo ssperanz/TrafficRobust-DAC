@@ -39,7 +39,7 @@ int main() {
     logger.logData(data);
 
     Viewer viewer(data);
-    viewer.show();
+    viewer.showConfigurations();
 
     out << "### RISOLUZIONE ###\n";
     Master master(data, env);

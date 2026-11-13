@@ -25,6 +25,8 @@ link_directories($ENV{GUROBI_HOME}/lib)
 
 add_executable(TrafficRobust-DAC
     main.cpp
+    generate_dac_data.cpp
+    DACCSVGenerator.cpp
     Master.cpp
     Slave.cpp
     Logger.cpp

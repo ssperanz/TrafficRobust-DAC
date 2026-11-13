@@ -2,12 +2,13 @@
 
 DACCSVGenerator::DACCSVGenerator(int rows, int cols, int nhours, int startHour,
                                  int min_sector_length, int nconfigs,
-                                 int NFLOWS, int h, int t_p, double epsilon,
-                                 double mu_departures_dist)
+                                 int NFLOWS, int NFLIGHTS, int h, int t_p,
+                                 double epsilon, double mu_departures_dist)
     : ROWS(rows), COLS(cols), NTIMES(nhours * h), STARTHOUR(startHour),
       NSECTORS(0), MINSECTORLENGTH(min_sector_length), NCONFIGS(nconfigs),
-      NFLOWS(NFLOWS), NTIMESINONEHOUR(h), MINCONFKEEPTIME(t_p),
-      EPSILON(epsilon), MU_DEPARTURES_DIST(mu_departures_dist) {}
+      NFLOWS(NFLOWS), NFLIGHTS(NFLIGHTS), NTIMESINONEHOUR(h),
+      MINCONFKEEPTIME(t_p), EPSILON(epsilon),
+      MU_DEPARTURES_DIST(mu_departures_dist) {}
 
 // TODO: to fix considering also h and startHour
 double DACCSVGenerator::hourlyFactor(int t) {
