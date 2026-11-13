@@ -1,7 +1,8 @@
 #include "Logger.h"
 #include <iomanip>
 
-Logger::Logger(const std::string &filename) : logFile(filename) {
+Logger::Logger(const std::string &filename)
+    : logFile(filename), startTime(std::chrono::high_resolution_clock::now()) {
   if (!logFile.is_open()) {
     throw std::runtime_error("Impossibile aprire il file di log: " + filename);
   }
@@ -100,6 +101,7 @@ void Logger::printGrids(DACData &data) {
 }
 
 void Logger::logData(DACData &data) {
+  logFile << "\n### DATI ###\n";
 
   logFile << "Dimensioni griglia: " << data.grid.getNRows() << "x"
           << data.grid.getNCols() << "\n";
@@ -155,10 +157,28 @@ void Logger::logData(DACData &data) {
   }
 
   logFile << "\n";
+
+  logFile << "Eccesso totale di ogni configurazione:\n";
+  for (Configuration &config : data.configurations) {
+    int totalExcess = 0;
+    logFile << "  Configurazione " << config.id << ": ";
+    for (int t = 0; t < data.grid.getNTimeslots(); t++) {
+      totalExcess += data.aux.E_t_c[t][config.id];
+    }
+    logFile << totalExcess << "\n";
+  }
+
+  logFile << "\n";
 }
 
 Logger::~Logger() {
   if (logFile.is_open()) {
     logFile.close();
   }
+}
+
+int Logger::getElapsedTime() {
+  auto endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = endTime - startTime;
+  return elapsed.count();
 }
