@@ -148,8 +148,6 @@ void Slave::update(MasterSolution &s) {
 }
 
 SlaveSolution Slave::solve() {
-  slave_model.set(GRB_IntParam_MIPFocus, 2);
-  slave_model.set(GRB_DoubleParam_Heuristics, 0.2);
   slave_model.optimize();
   SlaveSolution slaveSol(slave_model.get(GRB_DoubleAttr_ObjVal), e);
   return slaveSol;
