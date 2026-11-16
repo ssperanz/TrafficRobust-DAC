@@ -35,6 +35,7 @@ add_executable(TrafficRobust-DAC
     Solver.cpp
     Logger.cpp
     Viewer.cpp
+    GraphPlotter.cpp
 )
 
 # SciPlot headers
