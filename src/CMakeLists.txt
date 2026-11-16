@@ -5,6 +5,8 @@ project(TrafficRobust-DAC)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+get_filename_component(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+
 include(FetchContent) # If not included already
 
 FetchContent_Declare(sciplot_content
@@ -18,6 +20,7 @@ if(NOT sciplot_content_POPULATED)
 endif()
 
 include_directories(${sciplot_content_SOURCE_DIR})
+include_directories(${PROJECT_ROOT}/include)
 
 # Gurobi
 include_directories($ENV{GUROBI_HOME}/include)
@@ -25,10 +28,11 @@ link_directories($ENV{GUROBI_HOME}/lib)
 
 add_executable(TrafficRobust-DAC
     main.cpp
-    generate_dac_data.cpp
+    DACData.cpp
     DACCSVGenerator.cpp
     Master.cpp
     Slave.cpp
+    Solver.cpp
     Logger.cpp
     Viewer.cpp
 )
@@ -36,6 +40,7 @@ add_executable(TrafficRobust-DAC
 # SciPlot headers
 target_include_directories(TrafficRobust-DAC PRIVATE
     ${sciplot_content_SOURCE_DIR}
+    ${PROJECT_ROOT}/include
 )
 
 target_link_libraries(TrafficRobust-DAC

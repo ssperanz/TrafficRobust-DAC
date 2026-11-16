@@ -210,6 +210,7 @@ public:
 class DACData {
 public:
   DACData(const std::string &filename);
+  DACData(const std::string &filename, int startHour, int timeHorizonHours);
   Parameters parameters;
   Grid grid;
   AuxData aux;
@@ -226,9 +227,14 @@ public:
   int getNConfigurations();
   std::vector<int> getSimilarConfigurationsIndex(
       Configuration &c); // restituisce anche l'indice di c
-  void readRest(const std::string &filename);
-  Grid readGrid(const std::string &filename);
-  Parameters readParameters(const std::string &filename);
+  void readRest(const std::string &filename, int startHour = -1,
+                int timeHorizonHours = -1, int slotsPerHour = -1,
+                int sourceStartHour = -1);
+  Grid readGrid(const std::string &filename, int startHour = -1,
+                int timeHorizonHours = -1, int slotsPerHour = -1,
+                int sourceStartHour = -1);
+  Parameters readParameters(const std::string &filename, int startHour = -1,
+                            int timeHorizonHours = -1);
   void calculateAuxData();
 
 private:

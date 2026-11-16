@@ -1,11 +1,25 @@
 #include "Logger.h"
+#include <ctime>
 #include <iomanip>
+#include <sstream>
 
 Logger::Logger(const std::string &filename)
     : logFile(filename), startTime(std::chrono::high_resolution_clock::now()) {
   if (!logFile.is_open()) {
     throw std::runtime_error("Impossibile aprire il file di log: " + filename);
   }
+}
+
+std::string Logger::makeTimestampPrefix() {
+  auto now = std::chrono::system_clock::now();
+  auto in_time_t = std::chrono::system_clock::to_time_t(now);
+
+  std::tm tm_buf;
+  localtime_r(&in_time_t, &tm_buf);
+
+  std::ostringstream oss;
+  oss << std::put_time(&tm_buf, "%Y%m%d_%H%M%S");
+  return oss.str();
 }
 
 std::ofstream &Logger::getStream() { return logFile; }
@@ -181,4 +195,58 @@ int Logger::getElapsedTime() {
   auto endTime = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = endTime - startTime;
   return elapsed.count();
+}
+
+void Logger::writeIterationsSummaryHeader(
+    const std::string &filename, int rows, int cols, int nHours, int startHour,
+    int minSectorLength, int nConfigs, int nFlows, int nFlights, int h, int t_p,
+    double epsilon, double muDeparturesDist, int dataStartHour,
+    int timeHorizonMin, int timeHorizonMax, int seed) {
+  std::ofstream out(filename);
+  if (!out.is_open()) {
+    throw std::runtime_error("Impossibile aprire il file risultati: " +
+                             filename);
+  }
+
+  out << "### RISULTATI ITERAZIONI ###\n\n";
+  out << "Dati generali CSV generato:\n";
+  out << "- rows: " << rows << "\n";
+  out << "- cols: " << cols << "\n";
+  out << "- nhours: " << nHours << "\n";
+  out << "- starthour: " << startHour << "\n";
+  out << "- min_sector_length: " << minSectorLength << "\n";
+  out << "- nconfigs: " << nConfigs << "\n";
+  out << "- nflows: " << nFlows << "\n";
+  out << "- nflights: " << nFlights << "\n";
+  out << "- h (slot/ora): " << h << "\n";
+  out << "- t_p: " << t_p << "\n";
+  out << "- epsilon: " << epsilon << "\n";
+  out << "- seed: " << seed << "\n\n";
+
+  out << "Intervallo di tempo di DACData:\n";
+  out << "- data_starthour: " << dataStartHour << "\n";
+  out << "- data_timehorizon range: [" << timeHorizonMin << ", "
+      << timeHorizonMax << "]\n\n";
+
+  out << std::left << std::setw(18) << "dataTimeHorizon" << std::setw(12)
+      << "iterations" << std::setw(14) << "elapsed_sec" << std::setw(12)
+      << "timeslots" << std::setw(14) << "totalFlights" << std::setw(16)
+      << "finalTheta" << std::setw(20) << "finalSlaveExcess" << std::setw(12)
+      << "converged" << std::setw(10) << "optimal" << "\n";
+}
+
+void Logger::appendIterationSummaryRow(const std::string &filename,
+                                       const IterationSummaryRow &row) {
+  std::ofstream out(filename, std::ios::app);
+  if (!out.is_open()) {
+    throw std::runtime_error("Impossibile aprire il file risultati: " +
+                             filename);
+  }
+
+  out << std::left << std::setw(18) << row.dataTimeHorizon << std::setw(12)
+      << row.iterations << std::setw(14) << std::fixed << std::setprecision(2)
+      << row.elapsedSeconds << std::setw(12) << row.timeslots << std::setw(14)
+      << row.totalFlights << std::setw(16) << row.finalTheta << std::setw(20)
+      << row.finalSlaveExcess << std::setw(12) << std::boolalpha
+      << row.converged << std::setw(10) << row.optimal << "\n";
 }

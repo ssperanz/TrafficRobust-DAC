@@ -1,5 +1,5 @@
 #pragma once
-#include "generate_dac_data.h"
+#include "DACData.h"
 #include <vector>
 
 /* classe per visualizzare griglia con settori colorati */

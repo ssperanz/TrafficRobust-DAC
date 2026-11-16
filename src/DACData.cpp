@@ -8,8 +8,44 @@
 #include <unordered_map>
 #include <vector>
 
+#include "DACData.h"
 #include "Matrix.h"
-#include "generate_dac_data.h"
+
+namespace {
+struct TimeWindow {
+  bool enabled = false;
+  int startSlot = 0;
+  int endSlotExclusive = 0;
+};
+
+TimeWindow makeTimeWindow(int startHour, int timeHorizonHours,
+                          int sourceStartHour, int slotsPerHour) {
+  TimeWindow window;
+
+  if (startHour < 0 && timeHorizonHours < 0) {
+    return window;
+  }
+  if (startHour < 0 || timeHorizonHours < 0) {
+    throw std::invalid_argument(
+        "Both startHour and timeHorizonHours must be provided together");
+  }
+  if (timeHorizonHours <= 0) {
+    throw std::invalid_argument("timeHorizonHours must be greater than 0");
+  }
+  if (slotsPerHour <= 0) {
+    throw std::invalid_argument("Invalid slotsPerHour value");
+  }
+  if (startHour < sourceStartHour) {
+    throw std::invalid_argument(
+        "startHour cannot be earlier than source CSV start hour");
+  }
+
+  window.enabled = true;
+  window.startSlot = (startHour - sourceStartHour) * slotsPerHour;
+  window.endSlotExclusive = window.startSlot + timeHorizonHours * slotsPerHour;
+  return window;
+}
+} // namespace
 
 void AirBlock::setglevel(int t, int g) { gLevel[t] = g; }
 
@@ -179,7 +215,8 @@ Grid::Grid(int rows, int cols, const TimeHorizon &time)
       m_airBlocks.emplace_back(id++, r, c, time.size());
 }
 
-Parameters DACData::readParameters(const std::string &filename) {
+Parameters DACData::readParameters(const std::string &filename, int startHour,
+                                   int timeHorizonHours) {
   std::ifstream in(filename);
 
   if (!in)
@@ -215,10 +252,16 @@ Parameters DACData::readParameters(const std::string &filename) {
     }
   }
 
+  if (startHour >= 0 && timeHorizonHours >= 0) {
+    start_hour = startHour;
+  }
+
   return Parameters(start_hour, h, t_p, epsilon);
 }
 
-Grid DACData::readGrid(const std::string &filename) {
+Grid DACData::readGrid(const std::string &filename, int startHour,
+                       int timeHorizonHours, int slotsPerHour,
+                       int sourceStartHour) {
   // SEZIONE DA MODIFICARE deve leggere quanto dura lo slot di tempo e quanti
   // slot sono da file
   std::ifstream in(filename);
@@ -231,6 +274,14 @@ Grid DACData::readGrid(const std::string &filename) {
 
   TimeHorizon time(0, 0);
   time.slots.clear();
+
+  if (slotsPerHour < 0 || sourceStartHour < 0) {
+    Parameters sourceParameters = readParameters(filename);
+    slotsPerHour = sourceParameters.h;
+    sourceStartHour = sourceParameters.start_hour;
+  }
+  TimeWindow window = makeTimeWindow(startHour, timeHorizonHours,
+                                     sourceStartHour, slotsPerHour);
 
   int rows = 0;
   int cols = 0;
@@ -266,15 +317,34 @@ Grid DACData::readGrid(const std::string &filename) {
       int start = parseTime(f[1]);
       int end = parseTime(f[2]);
 
-      time.slots.emplace_back(id, start, end);
-      std::cout << "Slot temporale: " << id << " (" << start << " - " << end
-                << ")" << std::endl;
+      if (window.enabled) {
+        if (id < window.startSlot || id >= window.endSlotExclusive) {
+          continue;
+        }
+
+        int localId = id - window.startSlot;
+        time.slots.emplace_back(localId, start, end);
+        std::cout << "Slot temporale: " << localId << " (" << start << " - "
+                  << end << ")" << std::endl;
+      } else {
+        time.slots.emplace_back(id, start, end);
+        std::cout << "Slot temporale: " << id << " (" << start << " - " << end
+                  << ")" << std::endl;
+      }
     } else if (section == "[GRID]") {
       std::cout << "Lettura GRID" << std::endl;
       auto f = split(line, ',');
 
       rows = std::stoi(f[0]);
       cols = std::stoi(f[1]);
+    }
+  }
+
+  if (window.enabled) {
+    int expectedSlots = timeHorizonHours * slotsPerHour;
+    if (time.slots.size() != static_cast<size_t>(expectedSlots)) {
+      throw std::runtime_error(
+          "Requested time window exceeds available TIME section in CSV");
     }
   }
 
@@ -304,11 +374,10 @@ void DACData::calculateAuxData() {
           grid.getNCols() *
           grid.getNRows()); // stima del numero massimo di airblock in un flusso
 
+  // calculates tau_f_a
   aux.tau_f_a.resize(
       T, std::vector<std::vector<int>>(F, std::vector<int>(maxAbinFlow, 0)));
-  aux.BigM.resize(T, 0);
 
-  // calculates tau_f_a and BigM
   for (int t = 0; t < T; t++) {
     for (int f = 0; f < F; f++) {
       Flow &flow = flows[f];
@@ -318,15 +387,17 @@ void DACData::calculateAuxData() {
         AirBlock *ab = airblocksInFlow[abIdxPosition];
         aux.tau_f_a[t][f][abIdxPosition] = flow.tau_f_a(t, ab->getIndex());
       }
-      if (t == 0) {
-        for (int tau = 0; tau <= t + parameters.h - 1; tau++) {
-          aux.BigM[t] += flow.getScheduledDepartures(tau);
-        }
-      } else if (t + parameters.h < T) {
-        aux.BigM[t] =
-            aux.BigM[t - 1] + flow.getScheduledDepartures(t + parameters.h);
-      } else {
-        aux.BigM[t] = aux.BigM[t - 1];
+    }
+  }
+
+  // calculates BigM
+  aux.BigM.resize(T, 0);
+  for (int t = 0; t < T; t++) {
+    aux.BigM[t] = 0;
+    for (int f = 0; f < F; f++) {
+      Flow &flow = flows[f];
+      for (int tau = 0; tau <= std::min(t + parameters.h - 1, T - 1); tau++) {
+        aux.BigM[t] += flow.getScheduledDepartures(tau);
       }
     }
   }
@@ -406,6 +477,17 @@ DACData::DACData(const std::string &filename)
   calculateAuxData();
   std::cout << "finito calcolo dati ausiliari" << std::endl;
 }
+
+DACData::DACData(const std::string &filename, int startHour,
+                 int timeHorizonHours)
+    : parameters(readParameters(filename, startHour, timeHorizonHours)),
+      grid(readGrid(filename, startHour, timeHorizonHours)) {
+  std::cout << "finito lettura griglia" << std::endl;
+  readRest(filename, startHour, timeHorizonHours);
+  std::cout << "finito lettura file csv" << std::endl;
+  calculateAuxData();
+  std::cout << "finito calcolo dati ausiliari" << std::endl;
+}
 std::string DACData::trim(std::string s) {
   while (!s.empty() && isspace(s.front()))
     s.erase(s.begin());
@@ -434,7 +516,9 @@ std::vector<std::string> DACData::split(const std::string &s, char sep) {
   return out;
 }
 
-void DACData::readRest(const std::string &filename) {
+void DACData::readRest(const std::string &filename, int startHour,
+                       int timeHorizonHours, int slotsPerHour,
+                       int sourceStartHour) {
   std::ifstream in(filename);
 
   if (!in)
@@ -446,6 +530,14 @@ void DACData::readRest(const std::string &filename) {
 
   std::string line;
   std::string section;
+
+  if (slotsPerHour < 0 || sourceStartHour < 0) {
+    Parameters sourceParameters = readParameters(filename);
+    slotsPerHour = sourceParameters.h;
+    sourceStartHour = sourceParameters.start_hour;
+  }
+  TimeWindow window = makeTimeWindow(startHour, timeHorizonHours,
+                                     sourceStartHour, slotsPerHour);
 
   Matrix<double> *capPtr = NULL;
   Matrix<int> *departuresPtr = NULL;
@@ -471,6 +563,12 @@ void DACData::readRest(const std::string &filename) {
 
       int block = stoi(f[0]);
       int t = stoi(f[1]);
+      if (window.enabled) {
+        if (t < window.startSlot || t >= window.endSlotExclusive) {
+          continue;
+        }
+        t -= window.startSlot;
+      }
       double tr = stod(f[2]);
       int p = stoi(f[3]);
       int g = stoi(f[4]);
@@ -515,6 +613,12 @@ void DACData::readRest(const std::string &filename) {
 
       int sectorId = stoi(f[0]);
       int t = stoi(f[1]);
+      if (window.enabled) {
+        if (t < window.startSlot || t >= window.endSlotExclusive) {
+          continue;
+        }
+        t -= window.startSlot;
+      }
       double cap = stod(f[2]);
       if (capPtr == NULL) {
         capPtr = new Matrix<double>(sectors.size(), grid.getNTimeslots());
@@ -596,6 +700,12 @@ void DACData::readRest(const std::string &filename) {
 
       int flowId = stoi(f[0]);
       int time = stoi(f[1]);
+      if (window.enabled) {
+        if (time < window.startSlot || time >= window.endSlotExclusive) {
+          continue;
+        }
+        time -= window.startSlot;
+      }
       int departures = stoi(f[2]);
 
       if (departuresPtr == NULL) {
@@ -604,6 +714,12 @@ void DACData::readRest(const std::string &filename) {
       departuresPtr->set(flowId, time, departures);
     }
   }
+
+  if (capPtr == NULL || departuresPtr == NULL) {
+    throw std::runtime_error(
+        "Missing CAPACITY or DEPARTURES data in selected time window");
+  }
+
   for (size_t i = 0; i < sectors.size(); ++i) {
     sectors[i].setCapacity(capPtr->getLine(i));
   }

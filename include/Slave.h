@@ -1,6 +1,6 @@
 #pragma once
+#include "DACData.h"
 #include "Matrix.h"
-#include "generate_dac_data.h"
 #include "gurobi_c++.h"
 #include <iostream>
 #include <vector>
