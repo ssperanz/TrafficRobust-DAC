@@ -146,6 +146,7 @@ public:
   int getTimeToReachAirBlock(int ab_id);
   int getTimeThroughAirBlock(int ab_id);
   int getScheduledDepartures(int time);
+  int getCumulativeScheduledDepartures(int time);
   int tau_f_a(int t,
               int ab_id); // the earliest entry time in airspace block 'a'
                           // of aircraft in flow 'f' that are still in
@@ -205,6 +206,42 @@ public:
   std::vector<std::vector<int>>
       E_t_c;        // traffic excess of configuration 'c' at time 't'
   int totalFlights; // total number of flights
+};
+
+class TimeWindow {
+public:
+  bool enabled = false;
+  int startSlot = 0;
+  int endSlotExclusive = 0;
+
+  static TimeWindow create(int startHour, int timeHorizonHours,
+                           int sourceStartHour, int slotsPerHour) {
+    TimeWindow window;
+
+    if (startHour < 0 && timeHorizonHours < 0) {
+      return window;
+    }
+    if (startHour < 0 || timeHorizonHours < 0) {
+      throw std::invalid_argument(
+          "Both startHour and timeHorizonHours must be provided together");
+    }
+    if (timeHorizonHours <= 0) {
+      throw std::invalid_argument("timeHorizonHours must be greater than 0");
+    }
+    if (slotsPerHour <= 0) {
+      throw std::invalid_argument("Invalid slotsPerHour value");
+    }
+    if (startHour < sourceStartHour) {
+      throw std::invalid_argument(
+          "startHour cannot be earlier than source CSV start hour");
+    }
+
+    window.enabled = true;
+    window.startSlot = (startHour - sourceStartHour) * slotsPerHour;
+    window.endSlotExclusive =
+        window.startSlot + timeHorizonHours * slotsPerHour;
+    return window;
+  }
 };
 
 class DACData {

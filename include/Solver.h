@@ -17,7 +17,8 @@ struct SolverRunResult {
 class Solver {
 public:
   explicit Solver(Logger &logger);
-  SolverRunResult run(DACData &data, GRBEnv &env);
+  SolverRunResult run(DACData &data, GRBEnv &env,
+                     bool pUpperBoundEnabled = false);
 
 private:
   Logger &logger;

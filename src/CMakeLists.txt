@@ -36,7 +36,10 @@ add_executable(TrafficRobust-DAC
     Logger.cpp
     Viewer.cpp
     GraphPlotter.cpp
+    ../test/test.cpp
 )
+
+include_directories(${PROJECT_ROOT}/test)
 
 # SciPlot headers
 target_include_directories(TrafficRobust-DAC PRIVATE

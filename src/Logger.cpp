@@ -1,4 +1,5 @@
 #include "Logger.h"
+#include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -191,10 +192,10 @@ Logger::~Logger() {
   }
 }
 
-int Logger::getElapsedTime() {
+double Logger::getElapsedTime() {
   auto endTime = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = endTime - startTime;
-  return elapsed.count();
+  return std::round(elapsed.count() * 100.0) / 100.0;
 }
 
 void Logger::writeIterationsSummaryHeader(
@@ -228,11 +229,12 @@ void Logger::writeIterationsSummaryHeader(
   out << "- data_timehorizon range: [" << timeHorizonMin << ", "
       << timeHorizonMax << "]\n\n";
 
-  out << std::left << std::setw(18) << "dataTimeHorizon" << std::setw(12)
-      << "iterations" << std::setw(14) << "elapsed_sec" << std::setw(12)
-      << "timeslots" << std::setw(14) << "totalFlights" << std::setw(16)
-      << "finalTheta" << std::setw(20) << "finalSlaveExcess" << std::setw(12)
-      << "converged" << std::setw(10) << "optimal" << "\n";
+  out << std::left << std::setw(12) << "seed" << std::setw(16) << "pUpperBound"
+      << std::setw(18) << "dataTimeHorizon" << std::setw(12) << "iterations"
+      << std::setw(14) << "elapsed_sec" << std::setw(12) << "timeslots"
+      << std::setw(14) << "totalFlights" << std::setw(16) << "finalTheta"
+      << std::setw(20) << "finalSlaveExcess" << std::setw(12) << "converged"
+      << std::setw(10) << "optimal" << "\n";
 }
 
 void Logger::appendIterationSummaryRow(const std::string &filename,
@@ -243,10 +245,16 @@ void Logger::appendIterationSummaryRow(const std::string &filename,
                              filename);
   }
 
-  out << std::left << std::setw(18) << row.dataTimeHorizon << std::setw(12)
-      << row.iterations << std::setw(14) << std::fixed << std::setprecision(2)
-      << row.elapsedSeconds << std::setw(12) << row.timeslots << std::setw(14)
-      << row.totalFlights << std::setw(16) << row.finalTheta << std::setw(20)
+  out << std::left << std::setw(12) << row.seed << std::setw(16)
+      << std::boolalpha << row.pUpperBound << std::setw(18)
+      << row.dataTimeHorizon << std::setw(12) << row.iterations << std::setw(14)
+      << std::fixed << std::setprecision(2) << row.elapsedSeconds
+      << std::setw(12) << row.timeslots << std::setw(14) << row.totalFlights
+      << std::setw(16) << row.finalTheta << std::setw(20)
       << row.finalSlaveExcess << std::setw(12) << std::boolalpha
       << row.converged << std::setw(10) << row.optimal << "\n";
+}
+
+void Logger::info(const std::string &message) {
+  logFile << message << std::endl;
 }

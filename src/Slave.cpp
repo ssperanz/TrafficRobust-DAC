@@ -1,20 +1,26 @@
 #include "Slave.h"
 #include "Master.h"
 
-Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
+Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data, Logger &logger,
+             bool pUpperBoundEnabled)
     : T(data.grid.getNTimeslots()), env(env), solutionX(sol.x),
-      solutionTheta(sol.theta), slave_model(env), data(data),
+      solutionTheta(sol.theta), slave_model(env), data(data), logger(logger),
       p(T, data.flows.size()), q(T, data.airblocks.size()),
       Q(T, data.sectors.size()), e(T, data.sectors.size()),
-      E(T, data.configurations.size()), w(T, data.sectors.size()) {
+      E(T, data.configurations.size()), w(T, data.sectors.size()),
+      pUpperBoundEnabled(pUpperBoundEnabled) {
   // std::cout << "Costruzione modello slave..." << std::endl;
   //  Variabili
   for (int t = 0; t < T; t++) {
     for (Flow &flow : data.flows) {
       int f = flow.getId();
       string p_name = "p_" + to_string(t) + "_" + to_string(f);
-      p.at(t, f) = slave_model.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
-                                      p_name); // 6.50
+      int upper_bound = flow.getCumulativeScheduledDepartures(t);
+      // int upper_bound = flow.getScheduledDepartures(t) + 1;
+
+      p.at(t, f) = slave_model.addVar(
+          0.0, pUpperBoundEnabled ? upper_bound : GRB_INFINITY, 0.0,
+          GRB_INTEGER, p_name); // 6.50
     }
     for (AirBlock &ab : data.airblocks) {
       int a = ab.getIndex();
@@ -41,6 +47,22 @@ Slave::Slave(MasterSolution &sol, GRBEnv &env, DACData &data)
                                       E_name); // 6.53
     }
   }
+
+  // for (Flow &flow : data.flows) {
+  //   for (int t = 0; t < T; t++) {
+  //
+  //    int cumulative = 0;
+  //
+  //    for (int tau = 0; tau <= t; tau++) {
+  //      cumulative += flow.getScheduledDepartures(tau);
+  //    }
+  //    std::ostream &out = logger.getStream();
+  //    out << "f = " << flow.getId() << " t = " << t
+  //        << " cumulative = " << cumulative
+  //        << " upper_bound = " << flow.getCumulativeScheduledDepartures(t)
+  //        << "\n";
+  //  }
+  //}
 
   // std::cout << "Aggiunti vincoli 6.50-6.54" << std::endl;
 
@@ -140,28 +162,62 @@ void Slave::constructObjective() {
 }
 
 void Slave::update(MasterSolution &s) {
-  // slave_model.write("slave_model.lp");
+  static int i = 1;
+  // slave_model.write("slave_model_" + std::to_string(i) + ".lp");
   solutionX = s.x;
   solutionTheta = s.theta;
+  i++;
 
   this->constructObjective();
 }
 
 SlaveSolution Slave::solve() {
+  // slave_model.set(GRB_DoubleParam_Heuristics, 0.01);
   slave_model.optimize();
-  SlaveSolution slaveSol(slave_model.get(GRB_DoubleAttr_ObjVal), e);
+  SlaveSolution slaveSol(slave_model.get(GRB_DoubleAttr_ObjVal), p, q, Q, e, E,
+                         solutionX);
   return slaveSol;
 }
 
-SlaveSolution::SlaveSolution(double objVal, Matrix<GRBVar> &e_vars)
-    : excess(objVal), e(e_vars.getnrows(), e_vars.getncols()) {
+SlaveSolution::SlaveSolution(double objVal, Matrix<GRBVar> &p_vars,
+                             Matrix<GRBVar> &q_vars, Matrix<GRBVar> &Q_vars,
+                             Matrix<GRBVar> &e_vars, Matrix<GRBVar> &E_vars,
+                             Matrix<double> &solutionX)
+    : excess(objVal), p(p_vars.getnrows(), p_vars.getncols()),
+      q(q_vars.getnrows(), q_vars.getncols()),
+      Q(Q_vars.getnrows(), Q_vars.getncols()),
+      e(e_vars.getnrows(), e_vars.getncols()),
+      E(E_vars.getnrows(), E_vars.getncols()),
+      solutionX(solutionX.getnrows(), solutionX.getncols()) {
 
-  int T = e_vars.getnrows();
-  int nSectors = e_vars.getncols();
+  for (int t = 0; t < p_vars.getnrows(); t++) {
+    for (int f = 0; f < p_vars.getncols(); f++) {
+      p.at(t, f) = p_vars.at(t, f).get(GRB_DoubleAttr_X);
+    }
+  }
 
-  for (int t = 0; t < T; t++) {
-    for (int s = 0; s < nSectors; s++) {
-      this->e.at(t, s) = e_vars.at(t, s).get(GRB_DoubleAttr_X);
+  for (int t = 0; t < q_vars.getnrows(); t++) {
+    for (int a = 0; a < q_vars.getncols(); a++) {
+      q.at(t, a) = q_vars.at(t, a).get(GRB_DoubleAttr_X);
+    }
+  }
+
+  for (int t = 0; t < Q_vars.getnrows(); t++) {
+    for (int s = 0; s < Q_vars.getncols(); s++) {
+      Q.at(t, s) = Q_vars.at(t, s).get(GRB_DoubleAttr_X);
+      e.at(t, s) = e_vars.at(t, s).get(GRB_DoubleAttr_X);
+    }
+  }
+
+  for (int t = 0; t < E_vars.getnrows(); t++) {
+    for (int c = 0; c < E_vars.getncols(); c++) {
+      E.at(t, c) = E_vars.at(t, c).get(GRB_DoubleAttr_X);
+    }
+  }
+
+  for (int t = 0; t < solutionX.getnrows(); t++) {
+    for (int c = 0; c < solutionX.getncols(); c++) {
+      this->solutionX.at(t, c) = solutionX.at(t, c);
     }
   }
 }

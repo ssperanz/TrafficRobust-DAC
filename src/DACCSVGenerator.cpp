@@ -69,6 +69,20 @@ void DACCSVGenerator::validateSectors(
   }
 }
 
+bool DACCSVGenerator::checkSectorsIdenticity(const std::vector<int> &sectorA,
+                                          const std::vector<int> &sectorB) {
+  if (sectorA.size() != sectorB.size()) {
+    return false;
+  }
+
+  std::vector<int> sortedA = sectorA;
+  std::vector<int> sortedB = sectorB;
+  std::sort(sortedA.begin(), sortedA.end());
+  std::sort(sortedB.begin(), sortedB.end());
+
+  return sortedA == sortedB;
+}
+
 void DACCSVGenerator::partition(
     int x1, int y1, int x2, int y2, int minSectorLength, int maxSectors,
     std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
@@ -441,7 +455,10 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   //-----------------------------
 
   std::vector<std::vector<int>> configs;
+  std::vector<std::vector<int>> uniqueSectors;
+  std::vector<int> uniqueSectorIds;
   int sectorId = 0;
+  NSECTORS = 0;
 
   out << "[SECTORS]\n";
   out << "id,airblocks\n";
@@ -467,17 +484,34 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
     validateSectors(sectors, ROWS, COLS);
     std::vector<int> sectorIds;
     for (size_t i = 0; i < sectors.size(); i++) {
-      sectorIds.push_back(sectorId);
-      out << sectorId++ << ",\"";
-      for (size_t j = 0; j < sectors[i].size(); j++) {
-        out << sectors[i][j];
-        if (j + 1 < sectors[i].size())
-          out << ";";
+      int currentSectorId = -1;
+      for (size_t u = 0; u < uniqueSectors.size(); ++u) {
+        if (checkSectorsIdenticity(uniqueSectors[u], sectors[i])) {
+          currentSectorId = uniqueSectorIds[u];
+          break;
+        }
       }
-      out << "\"\n";
+
+      if (currentSectorId == -1) {
+        currentSectorId = sectorId++;
+        uniqueSectors.push_back(sectors[i]);
+        uniqueSectorIds.push_back(currentSectorId);
+
+        out << currentSectorId << ",\"";
+        for (size_t j = 0; j < sectors[i].size(); j++) {
+          out << sectors[i][j];
+          if (j + 1 < sectors[i].size())
+            out << ";";
+        }
+        out << "\"\n";
+      }
+
+      sectorIds.push_back(currentSectorId);
     }
     configs.push_back(sectorIds);
   }
+
+  NSECTORS = sectorId;
 
   out << "\n";
 

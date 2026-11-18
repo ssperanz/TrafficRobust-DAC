@@ -11,42 +11,6 @@
 #include "DACData.h"
 #include "Matrix.h"
 
-namespace {
-struct TimeWindow {
-  bool enabled = false;
-  int startSlot = 0;
-  int endSlotExclusive = 0;
-};
-
-TimeWindow makeTimeWindow(int startHour, int timeHorizonHours,
-                          int sourceStartHour, int slotsPerHour) {
-  TimeWindow window;
-
-  if (startHour < 0 && timeHorizonHours < 0) {
-    return window;
-  }
-  if (startHour < 0 || timeHorizonHours < 0) {
-    throw std::invalid_argument(
-        "Both startHour and timeHorizonHours must be provided together");
-  }
-  if (timeHorizonHours <= 0) {
-    throw std::invalid_argument("timeHorizonHours must be greater than 0");
-  }
-  if (slotsPerHour <= 0) {
-    throw std::invalid_argument("Invalid slotsPerHour value");
-  }
-  if (startHour < sourceStartHour) {
-    throw std::invalid_argument(
-        "startHour cannot be earlier than source CSV start hour");
-  }
-
-  window.enabled = true;
-  window.startSlot = (startHour - sourceStartHour) * slotsPerHour;
-  window.endSlotExclusive = window.startSlot + timeHorizonHours * slotsPerHour;
-  return window;
-}
-} // namespace
-
 void AirBlock::setglevel(int t, int g) { gLevel[t] = g; }
 
 void AirBlock::setplevel(int t, int p) { pLevel[t] = p; }
@@ -105,6 +69,9 @@ int Configuration::getExcess(int t) {
 }*/
 
 bool Configuration::checkSimilarity(Configuration &c2) {
+  if (sectors.size() == 2 && c2.sectors.size() == 2) {
+    return true; // consideriamo simili tutte le configurazioni con 2 settori
+  }
   int intersection = 0;
   for (int s1 = 0; s1 < sectors.size(); s1++) {
     for (int s2 = 0; s2 < c2.sectors.size(); s2++) {
@@ -172,6 +139,14 @@ int Flow::getScheduledDepartures(int time) {
     throw std::out_of_range("Invalid time index");
   }
   return num_of_scheduled_departures[time];
+}
+
+int Flow::getCumulativeScheduledDepartures(int time) {
+  int total = 0;
+  for (int i = 0; i <= time; i++) {
+    total += num_of_scheduled_departures[i];
+  }
+  return total;
 }
 
 int Flow::tau_f_a(int t, int ab_id) {
@@ -280,8 +255,8 @@ Grid DACData::readGrid(const std::string &filename, int startHour,
     slotsPerHour = sourceParameters.h;
     sourceStartHour = sourceParameters.start_hour;
   }
-  TimeWindow window = makeTimeWindow(startHour, timeHorizonHours,
-                                     sourceStartHour, slotsPerHour);
+  TimeWindow window = TimeWindow::create(startHour, timeHorizonHours,
+                                         sourceStartHour, slotsPerHour);
 
   int rows = 0;
   int cols = 0;
@@ -369,10 +344,8 @@ void DACData::calculateAuxData() {
   int T = grid.getNTimeslots();
   int F = flows.size();
   int maxAbinFlow =
-      3 *
-      sqrt(
-          grid.getNCols() *
-          grid.getNRows()); // stima del numero massimo di airblock in un flusso
+      3 * sqrt(grid.getNCols() * grid.getNRows()); // stima del numero massimo
+                                                   // di airblock in un flusso
 
   // calculates tau_f_a
   aux.tau_f_a.resize(
@@ -536,8 +509,8 @@ void DACData::readRest(const std::string &filename, int startHour,
     slotsPerHour = sourceParameters.h;
     sourceStartHour = sourceParameters.start_hour;
   }
-  TimeWindow window = makeTimeWindow(startHour, timeHorizonHours,
-                                     sourceStartHour, slotsPerHour);
+  TimeWindow window = TimeWindow::create(startHour, timeHorizonHours,
+                                         sourceStartHour, slotsPerHour);
 
   Matrix<double> *capPtr = NULL;
   Matrix<int> *departuresPtr = NULL;

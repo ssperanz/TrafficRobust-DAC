@@ -1,5 +1,6 @@
 #pragma once
 #include "DACData.h"
+#include "Logger.h"
 #include "Matrix.h"
 #include "Slave.h"
 #include "gurobi_c++.h"
@@ -38,6 +39,7 @@ class Master {
   GRBEnv env;
   GRBModel master_model;
   DACData data;
+  Logger &logger;
 
   std::vector<SlaveSolution> realizations;
   int T;
@@ -48,7 +50,7 @@ class Master {
 
 public:
   int iter;
-  Master(DACData &, GRBEnv &);
+  Master(DACData &, GRBEnv &, Logger &);
   MasterSolution solve();
   // MasterSolution getActualSolution();
   void addCut(SlaveSolution &slaveSol);

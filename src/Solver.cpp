@@ -1,10 +1,12 @@
 #include "Solver.h"
 
+#include <iomanip>
 #include <iostream>
 
 Solver::Solver(Logger &logger) : logger(logger) {}
 
-SolverRunResult Solver::run(DACData &data, GRBEnv &env) {
+SolverRunResult Solver::run(DACData &data, GRBEnv &env,
+                            bool pUpperBoundEnabled) {
   std::ostream &out = logger.getStream();
   SolverRunResult result{0, 0.0, 0.0, false, false};
 
@@ -12,17 +14,18 @@ SolverRunResult Solver::run(DACData &data, GRBEnv &env) {
   viewer.showConfigurations();
 
   out << "### RISOLUZIONE ###\n";
-  Master master(data, env);
+  Master master(data, env, logger);
   MasterSolution sol = master.solve();
-  Slave slave(sol, env, data);
+  Slave slave(sol, env, data, logger, pUpperBoundEnabled);
   bool converged = false;
   while (!converged) {
     out << "Iterazione " << master.iter << "\n";
     out << "  Risoluzione Master\n";
-    int now = logger.getElapsedTime();
+    double now = logger.getElapsedTime();
     sol = master.solve();
     out << "  Valore obiettivo Master: " << sol.theta << "\n";
-    out << "  Risolto Master in " << logger.getElapsedTime() - now
+    out << "  Risolto Master in " << std::fixed << std::setprecision(2)
+        << (logger.getElapsedTime() - now) << std::defaultfloat
         << " secondi.\n";
     slave.update(sol);
     out << "  Aggiornamento Slave completato.\n\n";
@@ -30,9 +33,64 @@ SolverRunResult Solver::run(DACData &data, GRBEnv &env) {
     now = logger.getElapsedTime();
     SlaveSolution slaveSol = slave.solve();
     out << "  Valore obiettivo Slave: " << slaveSol.excess << "\n";
+
+    out << "  Valori finali dello Slave - iterazione " << master.iter - 1
+        << ":\n";
+    out << std::fixed << std::setprecision(0);
+
+    out << "    p(t,f):\n";
+    for (int t = 0; t < slaveSol.p.getnrows(); t++) {
+      for (int f = 0; f < slaveSol.p.getncols(); f++) {
+        out << "      p(" << t << "," << f
+            << ") = " << std::abs(slaveSol.p.at(t, f)) << "\n";
+      }
+    }
+
+    out << "    q(t,a):\n";
+    for (int t = 0; t < slaveSol.q.getnrows(); t++) {
+      for (int a = 0; a < slaveSol.q.getncols(); a++) {
+        out << "      q(" << t << "," << a
+            << ") = " << std::abs(slaveSol.q.at(t, a)) << "\n";
+      }
+    }
+
+    out << "    Q(t,s):\n";
+    for (int t = 0; t < slaveSol.Q.getnrows(); t++) {
+      for (int s = 0; s < slaveSol.Q.getncols(); s++) {
+        out << "      Q(" << t << "," << s
+            << ") = " << std::abs(slaveSol.Q.at(t, s)) << "\n";
+      }
+    }
+
+    out << "    e(t,s):\n";
+    for (int t = 0; t < slaveSol.e.getnrows(); t++) {
+      for (int s = 0; s < slaveSol.e.getncols(); s++) {
+        out << "      e(" << t << "," << s
+            << ") = " << std::abs(slaveSol.e.at(t, s)) << "\n";
+      }
+    }
+
+    out << "    E(t,c):\n";
+    for (int t = 0; t < slaveSol.E.getnrows(); t++) {
+      for (int c = 0; c < slaveSol.E.getncols(); c++) {
+        out << "      E(" << t << "," << c
+            << ") = " << std::abs(slaveSol.E.at(t, c)) << "\n";
+      }
+    }
+
+    out << "    X(t,c):\n";
+    for (int t = 0; t < slaveSol.solutionX.getnrows(); t++) {
+      for (int c = 0; c < slaveSol.solutionX.getncols(); c++) {
+        out << "      X(" << t << "," << c
+            << ") = " << slaveSol.solutionX.at(t, c) << "\n";
+      }
+    }
+
+    out << std::defaultfloat;
     double max_excess = slaveSol.excess;
     result.finalSlaveExcess = max_excess;
-    out << "  Risolto Slave in " << logger.getElapsedTime() - now
+    out << "  Risolto Slave in " << std::fixed << std::setprecision(2)
+        << (logger.getElapsedTime() - now) << std::defaultfloat
         << " secondi.\n";
     if (max_excess - sol.theta <= data.parameters.epsilon) {
       out << "Aggiustamento completato! Soluzione ottima trovata." << std::endl;

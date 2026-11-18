@@ -1,5 +1,6 @@
 #pragma once
 #include "DACData.h"
+#include "Logger.h"
 #include "Matrix.h"
 #include "gurobi_c++.h"
 #include <iostream>
@@ -20,15 +21,18 @@ class Slave {
   Matrix<GRBVar> E;
   Matrix<GRBVar> w;
 
+  bool pUpperBoundEnabled;
   GRBEnv env;
   GRBModel slave_model;
   // MasterSolution &solution;
   Matrix<double> solutionX;
   double solutionTheta;
   DACData data;
+  Logger &logger;
 
 public:
-  Slave(MasterSolution &s, GRBEnv &env, DACData &data);
+  Slave(MasterSolution &s, GRBEnv &env, DACData &data, Logger &logger,
+        bool pUpperBoundEnabled = false);
   void constructObjective();
   SlaveSolution solve();
   void update(MasterSolution &s);
@@ -37,6 +41,14 @@ public:
 class SlaveSolution {
 public:
   double excess;
+  Matrix<double> p;
+  Matrix<double> q;
+  Matrix<double> Q;
   Matrix<double> e;
-  SlaveSolution(double obj, Matrix<GRBVar> &e);
+  Matrix<double> E;
+  Matrix<double> solutionX;
+
+  SlaveSolution(double obj, Matrix<GRBVar> &p_vars, Matrix<GRBVar> &q_vars,
+                Matrix<GRBVar> &Q_vars, Matrix<GRBVar> &e_vars,
+                Matrix<GRBVar> &E_vars, Matrix<double> &solutionX);
 };

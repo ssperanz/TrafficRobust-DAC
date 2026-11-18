@@ -38,8 +38,6 @@ public:
             std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
                 &sectorsCoordinates,
             std::mt19937 &rng);
-  void validateSectors(const std::vector<std::vector<int>> &sectors, int ROWS,
-                       int COLS);
 
 private:
   int ROWS;
@@ -59,4 +57,8 @@ private:
   generateStraightTrajectory(std::vector<int> &trajectory, int start, int end,
                              int ROWS, int COLS, std::mt19937 &rng,
                              std::uniform_real_distribution<double> &noise);
+  bool checkSectorsIdenticity(const std::vector<int> &sectorA,
+                              const std::vector<int> &sectorB);
+  void validateSectors(const std::vector<std::vector<int>> &sectors, int ROWS,
+                       int COLS);
 };

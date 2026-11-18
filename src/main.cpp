@@ -6,10 +6,10 @@
 // #include "utils.h"
 // #include "Writer.h"
 // #include "TestData.h"
-#include "Master.h"
-#include "Slave.h"
 #include "Solver.h"
+#include "Test.h"
 #include "Viewer.h"
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -22,72 +22,96 @@ int main() {
   int STARTHOUR = 0;
   int DATA_STARTHOUR = 6;
   int DATA_TIMEHORIZON_MIN = 2;
-  int DATA_TIMEHORIZON_MAX = 5;
+  int DATA_TIMEHORIZON_MAX = 4;
   int MIN_SECTOR_LENGTH = 3;
   int NCONFIGS = 20;
-  int NFLOWS = 40;
-  int NFLIGHTS = 60;
+  int NFLOWS = 80;
+  int NFLIGHTS = 140;
   int H = 6;
-  int T_P = 6;
+  int T_P = 2;
   double EPSILON = 1e-4;
   double MU_DEPARTURES_DIST = 0.15;
-  int SEED = 42;
+  std::vector<int> seeds = {42, 78, 91, 113};
 
   try {
     std::string timestampPrefix = Logger::makeTimestampPrefix();
-    std::string baseLogFileName = timestampPrefix + "-log";
-    std::string summaryFileName = timestampPrefix + "-iterations-summary.txt";
-
-    Logger::writeIterationsSummaryHeader(
-        summaryFileName, ROWS, COLS, NHOURS, STARTHOUR, MIN_SECTOR_LENGTH,
-        NCONFIGS, NFLOWS, NFLIGHTS, H, T_P, EPSILON, MU_DEPARTURES_DIST,
-        DATA_STARTHOUR, DATA_TIMEHORIZON_MIN, DATA_TIMEHORIZON_MAX, SEED);
-
-    std::cout << "Generazione dati DAC..." << std::endl;
-    DACCSVGenerator generator(ROWS, COLS, NHOURS, STARTHOUR, MIN_SECTOR_LENGTH,
-                              NCONFIGS, NFLOWS, NFLIGHTS, H, T_P, EPSILON,
-                              MU_DEPARTURES_DIST);
-    generator.generateDACCSV("path.csv", SEED);
-    std::cout << "Dati DAC generati e salvati in path.csv" << std::endl;
 
     GRBEnv env(true);
     env.set("LogFile", "Gurobi.log");
     std::cout << "Inizializzazione ambiente Gurobi..." << std::endl;
     env.start();
 
-    for (int dataTimeHorizon = DATA_TIMEHORIZON_MIN;
-         dataTimeHorizon <= DATA_TIMEHORIZON_MAX; dataTimeHorizon++) {
-      std::string logFileName =
-          baseLogFileName + "-h" + std::to_string(dataTimeHorizon) + ".txt";
-      Logger logger(logFileName);
-      std::ostream &out = logger.getStream();
+    bool RUN_SMALL_INSTANCE = true;
+    if (RUN_SMALL_INSTANCE) {
+      Test test("../test/test1.csv", 0, 2, "test1-log.txt");
+      test.run(env, false);
+    } else {
+      for (int seed : seeds) {
+        std::cout << "\n=== Generazione dati per seed " << seed
+                  << " ===" << std::endl;
+        DACCSVGenerator generator(ROWS, COLS, NHOURS, STARTHOUR,
+                                  MIN_SECTOR_LENGTH, NCONFIGS, NFLOWS, NFLIGHTS,
+                                  H, T_P, EPSILON, MU_DEPARTURES_DIST);
+        generator.generateDACCSV("path.csv", seed);
 
-      out << "### PARAMETRI ITERAZIONE ###\n";
-      out << "DATA_STARTHOUR = " << DATA_STARTHOUR << "\n";
-      out << "DATA_TIMEHORIZON = " << dataTimeHorizon << " ore\n\n";
+        for (bool p_upperbound : {false, true}) {
+          std::string baseLogFileName =
+              timestampPrefix + "-seed" + std::to_string(seed) +
+              (p_upperbound ? "-pupper" : "-pNoUpper");
+          std::string summarySeedFileName =
+              baseLogFileName + "-iterations-summary.txt";
 
-      out << "Lettura dati...\n\n";
-      DACData data("path.csv", DATA_STARTHOUR, dataTimeHorizon);
-      out << "\n### DATI ###\n";
-      logger.logData(data);
+          Logger::writeIterationsSummaryHeader(
+              summarySeedFileName, ROWS, COLS, NHOURS, STARTHOUR,
+              MIN_SECTOR_LENGTH, NCONFIGS, NFLOWS, NFLIGHTS, H, T_P, EPSILON,
+              MU_DEPARTURES_DIST, DATA_STARTHOUR, DATA_TIMEHORIZON_MIN,
+              DATA_TIMEHORIZON_MAX, seed);
 
-      Solver solver(logger);
-      SolverRunResult runResult = solver.run(data, env);
+          std::cout << "\n=== Seed " << seed
+                    << " / p_upperbound = " << std::boolalpha << p_upperbound
+                    << " ===" << std::endl;
 
-      Logger::IterationSummaryRow summaryRow{
-          dataTimeHorizon,
-          runResult.iterations,
-          static_cast<double>(logger.getElapsedTime()),
-          data.grid.getNTimeslots(),
-          data.aux.totalFlights,
-          runResult.finalTheta,
-          runResult.finalSlaveExcess,
-          runResult.converged,
-          runResult.optimal};
-      Logger::appendIterationSummaryRow(summaryFileName, summaryRow);
+          for (int dataTimeHorizon = DATA_TIMEHORIZON_MIN;
+               dataTimeHorizon <= DATA_TIMEHORIZON_MAX; dataTimeHorizon++) {
+            std::string logFileName = baseLogFileName + "-h" +
+                                      std::to_string(dataTimeHorizon) + ".txt";
+            Logger logger(logFileName);
+            std::ostream &out = logger.getStream();
 
-      out << "Tempo totale di esecuzione: " << logger.getElapsedTime()
-          << " secondi." << endl;
+            out << "### PARAMETRI ITERAZIONE ###\n";
+            out << "SEED = " << seed << "\n";
+            out << "P_UPPERBOUND = " << std::boolalpha << p_upperbound << "\n";
+            out << "DATA_STARTHOUR = " << DATA_STARTHOUR << "\n";
+            out << "DATA_TIMEHORIZON = " << dataTimeHorizon << " ore\n\n";
+
+            out << "Lettura dati...\n\n";
+            DACData data("path.csv", DATA_STARTHOUR, dataTimeHorizon);
+            out << "\n### DATI ###\n";
+            logger.logData(data);
+
+            Solver solver(logger);
+            SolverRunResult runResult = solver.run(data, env, p_upperbound);
+
+            Logger::IterationSummaryRow summaryRow{
+                seed,
+                p_upperbound,
+                dataTimeHorizon,
+                runResult.iterations - 1,
+                static_cast<double>(logger.getElapsedTime()),
+                data.grid.getNTimeslots(),
+                data.aux.totalFlights,
+                runResult.finalTheta,
+                runResult.finalSlaveExcess,
+                runResult.converged,
+                runResult.optimal};
+            Logger::appendIterationSummaryRow(summarySeedFileName, summaryRow);
+
+            out << "Tempo totale di esecuzione: " << std::fixed
+                << std::setprecision(2) << logger.getElapsedTime()
+                << std::defaultfloat << " secondi." << endl;
+          }
+        }
+      }
     }
 
   } catch (GRBException &e) {

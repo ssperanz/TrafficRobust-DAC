@@ -7,6 +7,8 @@
 class Logger {
 public:
   struct IterationSummaryRow {
+    int seed;
+    bool pUpperBound;
     int dataTimeHorizon;
     int iterations;
     double elapsedSeconds;
@@ -23,7 +25,7 @@ public:
   static std::string makeTimestampPrefix();
   std::ofstream &getStream();
   void logData(DACData &data);
-  int getElapsedTime();
+  double getElapsedTime();
   static void writeIterationsSummaryHeader(
       const std::string &filename, int rows, int cols, int nHours,
       int startHour, int minSectorLength, int nConfigs, int nFlows,
@@ -31,6 +33,7 @@ public:
       int dataStartHour, int timeHorizonMin, int timeHorizonMax, int seed);
   static void appendIterationSummaryRow(const std::string &filename,
                                         const IterationSummaryRow &row);
+  void info(const std::string &message);
 
   ~Logger();
 

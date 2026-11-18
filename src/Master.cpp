@@ -10,9 +10,10 @@ MasterSolution Master::solve() {
   return solution;
 }
 
-Master::Master(DACData &data, GRBEnv &env)
+Master::Master(DACData &data, GRBEnv &env, Logger &logger)
     : T(data.grid.getNTimeslots()), C(data.getNConfigurations()), x(T, C),
-      s(T, C), env(env), master_model(env), data(data), iter(0) {
+      s(T, C), env(env), master_model(env), data(data), iter(0),
+      logger(logger) {
   int t_p = data.parameters.t_p;
 
   // Inizializza la variabile theta
@@ -95,6 +96,8 @@ void Master::addCut(SlaveSolution &slaveSol) {
             slaveSol.e.at(t, data.configurations[c].sectors[i]->getIndex());
       }
       cut += x.at(t, c) * ConfigurationCExcess;
+      // logger.info("Cut at (" + std::to_string(t) + ", " + std::to_string(c) +
+      // "): " + std::to_string(cut.getValue()));
     }
   }
   master_model.addConstr(theta >= cut);
