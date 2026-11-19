@@ -22,16 +22,16 @@ int main() {
   int STARTHOUR = 0;
   int DATA_STARTHOUR = 6;
   int DATA_TIMEHORIZON_MIN = 2;
-  int DATA_TIMEHORIZON_MAX = 4;
+  int DATA_TIMEHORIZON_MAX = 5;
   int MIN_SECTOR_LENGTH = 3;
   int NCONFIGS = 20;
   int NFLOWS = 80;
-  int NFLIGHTS = 140;
+  int NFLIGHTS = 200;
   int H = 6;
-  int T_P = 2;
+  int T_P = 6;
   double EPSILON = 1e-4;
   double MU_DEPARTURES_DIST = 0.15;
-  std::vector<int> seeds = {42, 78, 91, 113};
+  std::vector<int> seeds = {42};
 
   try {
     std::string timestampPrefix = Logger::makeTimestampPrefix();
@@ -41,7 +41,7 @@ int main() {
     std::cout << "Inizializzazione ambiente Gurobi..." << std::endl;
     env.start();
 
-    bool RUN_SMALL_INSTANCE = true;
+    bool RUN_SMALL_INSTANCE = false;
     if (RUN_SMALL_INSTANCE) {
       Test test("../test/test1.csv", 0, 2, "test1-log.txt");
       test.run(env, false);
@@ -52,9 +52,9 @@ int main() {
         DACCSVGenerator generator(ROWS, COLS, NHOURS, STARTHOUR,
                                   MIN_SECTOR_LENGTH, NCONFIGS, NFLOWS, NFLIGHTS,
                                   H, T_P, EPSILON, MU_DEPARTURES_DIST);
-        generator.generateDACCSV("path.csv", seed);
+        generator.generateDACCSV("path.csv");
 
-        for (bool p_upperbound : {false, true}) {
+        for (bool p_upperbound : {false}) {
           std::string baseLogFileName =
               timestampPrefix + "-seed" + std::to_string(seed) +
               (p_upperbound ? "-pupper" : "-pNoUpper");

@@ -3,12 +3,13 @@
 DACCSVGenerator::DACCSVGenerator(int rows, int cols, int nhours, int startHour,
                                  int min_sector_length, int nconfigs,
                                  int NFLOWS, int NFLIGHTS, int h, int t_p,
-                                 double epsilon, double mu_departures_dist)
+                                 double epsilon, double mu_departures_dist,
+                                 unsigned int seed)
     : ROWS(rows), COLS(cols), NTIMES(nhours * h), STARTHOUR(startHour),
       NSECTORS(0), MINSECTORLENGTH(min_sector_length), NCONFIGS(nconfigs),
       NFLOWS(NFLOWS), NFLIGHTS(NFLIGHTS), NTIMESINONEHOUR(h),
       MINCONFKEEPTIME(t_p), EPSILON(epsilon),
-      MU_DEPARTURES_DIST(mu_departures_dist) {}
+      MU_DEPARTURES_DIST(mu_departures_dist), rng(seed) {}
 
 // TODO: to fix considering also h and startHour
 double DACCSVGenerator::hourlyFactor(int t) {
@@ -50,27 +51,27 @@ std::vector<int> DACCSVGenerator::calculateSectorAirblocks(int x1, int y1,
   return blocks;
 }
 
-void DACCSVGenerator::validateSectors(
+void DACCSVGenerator::validateConfigurations(
+    const std::vector<std::vector<int>> &configs,
     const std::vector<std::vector<int>> &sectors, int ROWS, int COLS) {
-  int airblockCount = 0;
-  for (const auto &sector : sectors) {
-    if (sector.empty()) {
-      throw std::invalid_argument("Empty sector found");
-    }
-    for (int block : sector) {
-      if (block < 0 || block >= ROWS * COLS) {
-        throw std::invalid_argument("Invalid airblock ID found in sector");
+  for (const auto &config : configs) {
+    int totalAirblocks = 0;
+    for (int sectorId : config) {
+      if (sectorId < 0 || sectorId >= sectors.size()) {
+        throw std::invalid_argument("Invalid sector ID found in configuration");
       }
+      /* verifica che la somma degli airblocks sia corretta */
+      totalAirblocks += sectors[sectorId].size();
     }
-    airblockCount += sector.size();
-  }
-  if (airblockCount != ROWS * COLS) {
-    throw std::invalid_argument("Not all airblocks are covered by sectors");
+    if (totalAirblocks != ROWS * COLS) {
+      throw std::invalid_argument(
+          "Incorrect total number of airblocks in configuration");
+    }
   }
 }
 
 bool DACCSVGenerator::checkSectorsIdenticity(const std::vector<int> &sectorA,
-                                          const std::vector<int> &sectorB) {
+                                             const std::vector<int> &sectorB) {
   if (sectorA.size() != sectorB.size()) {
     return false;
   }
@@ -83,7 +84,7 @@ bool DACCSVGenerator::checkSectorsIdenticity(const std::vector<int> &sectorA,
   return sortedA == sortedB;
 }
 
-void DACCSVGenerator::partition(
+/*void DACCSVGenerator::partition(
     int x1, int y1, int x2, int y2, int minSectorLength, int maxSectors,
     std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
         &sectorsCoordinates,
@@ -119,11 +120,75 @@ void DACCSVGenerator::partition(
     partition(x1, newY + 1, x2, y2, minSectorLength,
               maxSectors - (maxSectors / 2), sectorsCoordinates, rng);
   }
+}*/
+
+std::vector<std::vector<int>> DACCSVGenerator::partition(
+    int x1, int y1, int x2, int y2, int minSectorLength, int maxSectors,
+    std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
+        &sectorsCoordinates,
+    std::vector<int> &sectorIds) {
+
+  int width = x2 - x1 + 1;
+  int height = y2 - y1 + 1;
+
+  if (x1 > x2 || y1 > y2 || width <= 0 || height <= 0)
+    return {};
+
+  std::vector<std::vector<int>> configurations;
+
+  int sectorId = sectorIds.size();
+  sectorIds.push_back(sectorId);
+  sectorsCoordinates.push_back({{x1, y1}, {x2, y2}});
+  configurations.push_back({sectorId});
+
+  bool canSplitHorizontally = width >= height && width >= 2 * minSectorLength;
+  bool canSplitVertically = height >= 2 * minSectorLength;
+
+  if (maxSectors <= 1 || (!canSplitHorizontally && !canSplitVertically)) {
+    return configurations;
+  }
+
+  std::vector<std::vector<int>> subconf1;
+  std::vector<std::vector<int>> subconf2;
+
+  if (canSplitHorizontally) {
+    std::uniform_int_distribution<int> distX(x1 + minSectorLength - 1,
+                                             x2 - minSectorLength);
+    int newX = distX(rng);
+    subconf1 = partition(x1, y1, newX, y2, minSectorLength, maxSectors / 2,
+                         sectorsCoordinates, sectorIds);
+    subconf2 =
+        partition(newX + 1, y1, x2, y2, minSectorLength,
+                  maxSectors - maxSectors / 2, sectorsCoordinates, sectorIds);
+  } else {
+    std::uniform_int_distribution<int> distY(y1 + minSectorLength - 1,
+                                             y2 - minSectorLength);
+    int newY = distY(rng);
+    subconf1 = partition(x1, y1, x2, newY, minSectorLength, maxSectors / 2,
+                         sectorsCoordinates, sectorIds);
+    subconf2 =
+        partition(x1, newY + 1, x2, y2, minSectorLength,
+                  maxSectors - maxSectors / 2, sectorsCoordinates, sectorIds);
+  }
+
+  configurations.reserve(1 + subconf1.size() * subconf2.size());
+
+  for (const auto &first : subconf1) {
+    for (const auto &second : subconf2) {
+      std::vector<int> combined;
+      combined.reserve(first.size() + second.size());
+      combined.insert(combined.end(), first.begin(), first.end());
+      combined.insert(combined.end(), second.begin(), second.end());
+      configurations.push_back(std::move(combined));
+    }
+  }
+
+  return configurations;
 }
 
-void DACCSVGenerator::generateStraightTrajectory(
-    std::vector<int> &trajectory, int start, int end, int ROWS, int COLS,
-    std::mt19937 &rng, std::uniform_real_distribution<double> &noise) {
+void DACCSVGenerator::generateStraightTrajectory(std::vector<int> &trajectory,
+                                                 int start, int end, int ROWS,
+                                                 int COLS) {
 
   while (trajectory.back() != end) {
     int last = trajectory.back();
@@ -159,14 +224,13 @@ void DACCSVGenerator::generateStraightTrajectory(
 
 void DACCSVGenerator::generateSingleTrajectory(
     std::vector<int> &trajectory, int start, int end, int ROWS, int COLS,
-    std::vector<std::vector<int>> &allTrajectories, std::mt19937 &rng,
-    std::uniform_real_distribution<double> &noise, TrajectoryShape shape) {
+    std::vector<std::vector<int>> &allTrajectories, TrajectoryShape shape) {
 
   trajectory.push_back(start);
 
   switch (shape) {
   case STRAIGHT:
-    generateStraightTrajectory(trajectory, start, end, ROWS, COLS, rng, noise);
+    generateStraightTrajectory(trajectory, start, end, ROWS, COLS);
     break;
 
   case CURVED_1: {
@@ -247,11 +311,9 @@ void DACCSVGenerator::generateSingleTrajectory(
     int midBlock = midRow * COLS + midCol;
 
     /* Now we aim for the middle point */
-    generateStraightTrajectory(trajectory, start, midBlock, ROWS, COLS, rng,
-                               noise);
+    generateStraightTrajectory(trajectory, start, midBlock, ROWS, COLS);
     /* Then we go to the end */
-    generateStraightTrajectory(trajectory, midBlock, end, ROWS, COLS, rng,
-                               noise);
+    generateStraightTrajectory(trajectory, midBlock, end, ROWS, COLS);
     break;
   }
 
@@ -279,11 +341,9 @@ void DACCSVGenerator::generateSingleTrajectory(
     int midBlock = midRow * COLS + midCol;
 
     /* Now we aim for the middle point */
-    generateStraightTrajectory(trajectory, start, midBlock, ROWS, COLS, rng,
-                               noise);
+    generateStraightTrajectory(trajectory, start, midBlock, ROWS, COLS);
     /* Then we go to the end */
-    generateStraightTrajectory(trajectory, midBlock, end, ROWS, COLS, rng,
-                               noise);
+    generateStraightTrajectory(trajectory, midBlock, end, ROWS, COLS);
     break;
   }
 
@@ -293,12 +353,10 @@ void DACCSVGenerator::generateSingleTrajectory(
 }
 
 std::vector<std::vector<int>>
-DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
-                                         std::vector<int> &airportPositions) {
+DACCSVGenerator::generateAllTrajectories(std::vector<int> &airportPositions) {
   std::uniform_int_distribution<int> startDist(0, ROWS * COLS - 1);
   // std::uniform_int_distribution<int> lengthDist(TRAJ_LEN_MIN,
   // TRAJ_LEN_MAX);
-  std::uniform_real_distribution<double> noise(-0.15, 0.15);
   std::uniform_int_distribution<int> airportDist(0, ROWS * COLS - 1);
 
   int nAirports = ROWS * COLS / 10;
@@ -333,7 +391,7 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
     for (TrajectoryShape shape : {STRAIGHT, CURVED_1, CURVED_2}) {
       std::vector<int> trajectory;
       generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
-                               allTrajectories, rng, noise, shape);
+                               allTrajectories, shape);
       allTrajectories.push_back(trajectory);
     }
   }
@@ -355,7 +413,7 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
     for (TrajectoryShape shape : {STRAIGHT, CURVED_1}) {
       std::vector<int> trajectory;
       generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
-                               allTrajectories, rng, noise, shape);
+                               allTrajectories, shape);
       allTrajectories.push_back(trajectory);
     }
   }
@@ -391,17 +449,14 @@ DACCSVGenerator::generateAllTrajectories(std::mt19937 &rng,
 
     std::vector<int> trajectory;
     generateSingleTrajectory(trajectory, start, end, ROWS, COLS,
-                             allTrajectories, rng, noise);
+                             allTrajectories);
     allTrajectories.push_back(trajectory);
   }
 
   return allTrajectories;
 }
 
-void DACCSVGenerator::generateDACCSV(const std::string &filename,
-                                     unsigned int seed) {
-  std::mt19937 rng(seed);
-
+void DACCSVGenerator::generateDACCSV(const std::string &filename) {
   std::uniform_int_distribution<int> blockDist(0, ROWS * COLS - 1);
   std::uniform_int_distribution<int> sectorSizeDist(2, 15);
   std::uniform_real_distribution<double> capacityDist(40.0, 50.0);
@@ -455,67 +510,75 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
   //-----------------------------
 
   std::vector<std::vector<int>> configs;
+  std::vector<int> partitionSectorIds;
+  std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
+      sectorsCoordinates;
+
+  configs = partition(0, 0, COLS - 1, ROWS - 1, MINSECTORLENGTH, 12,
+                      sectorsCoordinates, partitionSectorIds);
+
+  if (configs.empty()) {
+    throw std::runtime_error("Partition generated no configurations");
+  }
+
+  std::vector<std::vector<int>> sectors;
+  sectors.reserve(sectorsCoordinates.size());
+  for (const auto &coord : sectorsCoordinates) {
+    sectors.push_back(calculateSectorAirblocks(
+        coord.first.first, coord.first.second, coord.second.first,
+        coord.second.second, ROWS, COLS));
+  }
+  validateConfigurations(configs, sectors, ROWS, COLS);
+
   std::vector<std::vector<int>> uniqueSectors;
-  std::vector<int> uniqueSectorIds;
-  int sectorId = 0;
-  NSECTORS = 0;
+  std::vector<int> coordinateIdToCsvSectorId(sectors.size(), -1);
 
   out << "[SECTORS]\n";
   out << "id,airblocks\n";
-  for (int c = 0; c < NCONFIGS; c++) {
-    int maxSector = sectorSizeDist(rng);
 
-    std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
-        sectorsCoordinates;
-    partition(0, 0, COLS - 1, ROWS - 1, MINSECTORLENGTH, maxSector,
-              sectorsCoordinates, rng);
-    NSECTORS += sectorsCoordinates.size();
-    std::vector<std::vector<int>> sectors;
-    for (const auto &coord : sectorsCoordinates) {
-      int x1 = coord.first.first;
-      int y1 = coord.first.second;
-      int x2 = coord.second.first;
-      int y2 = coord.second.second;
+  int csvSectorId = 0;
+  for (size_t i = 0; i < sectors.size(); ++i) {
+    int currentSectorId = -1;
 
-      std::vector<int> blocks =
-          calculateSectorAirblocks(x1, y1, x2, y2, ROWS, COLS);
-      sectors.push_back(blocks);
+    for (size_t u = 0; u < uniqueSectors.size(); ++u) {
+      if (checkSectorsIdenticity(uniqueSectors[u], sectors[i])) {
+        currentSectorId = static_cast<int>(u);
+        break;
+      }
     }
-    validateSectors(sectors, ROWS, COLS);
-    std::vector<int> sectorIds;
-    for (size_t i = 0; i < sectors.size(); i++) {
-      int currentSectorId = -1;
-      for (size_t u = 0; u < uniqueSectors.size(); ++u) {
-        if (checkSectorsIdenticity(uniqueSectors[u], sectors[i])) {
-          currentSectorId = uniqueSectorIds[u];
-          break;
+
+    if (currentSectorId == -1) {
+      currentSectorId = csvSectorId++;
+      uniqueSectors.push_back(sectors[i]);
+
+      out << currentSectorId << ",\"";
+      for (size_t j = 0; j < sectors[i].size(); ++j) {
+        out << sectors[i][j];
+        if (j + 1 < sectors[i].size()) {
+          out << ";";
         }
       }
-
-      if (currentSectorId == -1) {
-        currentSectorId = sectorId++;
-        uniqueSectors.push_back(sectors[i]);
-        uniqueSectorIds.push_back(currentSectorId);
-
-        out << currentSectorId << ",\"";
-        for (size_t j = 0; j < sectors[i].size(); j++) {
-          out << sectors[i][j];
-          if (j + 1 < sectors[i].size())
-            out << ";";
-        }
-        out << "\"\n";
-      }
-
-      sectorIds.push_back(currentSectorId);
+      out << "\"\n";
     }
-    configs.push_back(sectorIds);
+
+    coordinateIdToCsvSectorId[i] = currentSectorId;
   }
 
-  NSECTORS = sectorId;
+  for (auto &configuration : configs) {
+    for (int &coordinateId : configuration) {
+      if (coordinateId < 0 ||
+          coordinateId >= static_cast<int>(coordinateIdToCsvSectorId.size())) {
+        throw std::runtime_error(
+            "Invalid sector ID in partition configuration");
+      }
+      coordinateId = coordinateIdToCsvSectorId[coordinateId];
+    }
+  }
 
-  out << "\n";
+  NSECTORS = csvSectorId;
+  NCONFIGS = static_cast<int>(configs.size());
 
-  out << "\n";
+  out << "\n\n";
 
   //-----------------------------
   // CAPACITY
@@ -591,7 +654,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename,
 
   std::vector<int> airportPositions;
   std::vector<std::vector<int>> allTrajectories =
-      generateAllTrajectories(rng, airportPositions);
+      generateAllTrajectories(airportPositions);
   for (size_t trajectory = 0; trajectory < allTrajectories.size();
        trajectory++) {
     for (size_t i = 0; i < allTrajectories[trajectory].size(); i++) {
