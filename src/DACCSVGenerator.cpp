@@ -514,8 +514,36 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename) {
   std::vector<std::pair<std::pair<int, int>, std::pair<int, int>>>
       sectorsCoordinates;
 
-  configs = partition(0, 0, COLS - 1, ROWS - 1, MINSECTORLENGTH, 12,
+  configs = partition(0, 0, COLS - 1, ROWS - 1, MINSECTORLENGTH, 64,
                       sectorsCoordinates, partitionSectorIds);
+
+  /* Estrae tutte le istanze con meno di 5 settori */
+  std::vector<std::vector<int>> filteredConfigs;
+  std::vector<std::vector<int>> remainingConfigs;
+
+  for (const auto &config : configs) {
+    if (config.size() < 5) {
+      filteredConfigs.push_back(config);
+    } else {
+      remainingConfigs.push_back(config);
+    }
+  }
+
+  /* Shuffle delle configurazioni rimanenti */
+  std::shuffle(remainingConfigs.begin(), remainingConfigs.end(), rng);
+
+  /* Aggiunge configurazioni casuali fino a raggiungere NCONFIGS */
+  const size_t remaining =
+      NCONFIGS > filteredConfigs.size() ? NCONFIGS - filteredConfigs.size() : 0;
+
+  if (remainingConfigs.size() > remaining) {
+    remainingConfigs.resize(remaining);
+  }
+
+  filteredConfigs.insert(filteredConfigs.end(), remainingConfigs.begin(),
+                         remainingConfigs.end());
+
+  configs = std::move(filteredConfigs);
 
   if (configs.empty()) {
     throw std::runtime_error("Partition generated no configurations");
@@ -576,7 +604,7 @@ void DACCSVGenerator::generateDACCSV(const std::string &filename) {
   }
 
   NSECTORS = csvSectorId;
-  NCONFIGS = static_cast<int>(configs.size());
+  // NCONFIGS = static_cast<int>(configs.size());
 
   out << "\n\n";
 
